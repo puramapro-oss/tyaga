@@ -1,0 +1,407 @@
+-- schema.sql — TYAGA (schéma dédié `tyaga`, VPS auth.purama.dev)
+-- Exécuter via SSH : sshpass -p '[VPS_SSH_PASSWORD]' ssh root@72.62.191.111 psql
+-- Idempotent (IF NOT EXISTS). RLS 100% tables. FK ON DELETE CASCADE partout.
+
+CREATE SCHEMA IF NOT EXISTS tyaga;
+
+-- ============ PROFILES ============
+-- Trigger auto-create à la 1ère connexion (compte unifié écosystème)
+CREATE TABLE IF NOT EXISTS tyaga.profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email text,
+  full_name text,
+  avatar_url text,
+  is_super_admin boolean NOT NULL DEFAULT false,
+  google_connected boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE FUNCTION tyaga.handle_new_user()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = tyaga AS $$
+BEGIN
+  INSERT INTO tyaga.profiles (id, email, full_name, avatar_url)
+  VALUES (NEW.id, NEW.email, NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'avatar_url')
+  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO tyaga.vida_wallet (user_id) VALUES (NEW.id) ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END; $$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created_tyaga ON auth.users;
+CREATE TRIGGER on_auth_user_created_tyaga
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION tyaga.handle_new_user();
+
+-- ============ ITEMS ============
+CREATE TABLE IF NOT EXISTS tyaga.items (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  title text,                                -- rempli après scan/validation
+  category text,                             -- proposé par IA, modifiable
+  brand text,
+  model text,
+  condition text NOT NULL DEFAULT 'bon'
+    CHECK (condition IN ('neuf','excellent','tres_bon','bon','satisfaisant','a_reparer')),
+  description text,
+  tags text[] DEFAULT '{}',
+  status text NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft','scanned','estimated','listed','negotiating','sold','archived')),
+  floor_price_cents integer,                 -- plancher vendeur (EX-F3)
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_items_user ON tyaga.items(user_id);
+CREATE INDEX IF NOT EXISTS idx_items_status ON tyaga.items(status);
+
+-- ============ ITEM_PHOTOS ============
+-- Preuve horodatée (BRIEF §6) : sha256 + captured_at
+CREATE TABLE IF NOT EXISTS tyaga.item_photos (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id uuid NOT NULL REFERENCES tyaga.items(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  storage_path text NOT NULL,                -- {user_id}/{item_id}/{angle}.jpg
+  angle text NOT NULL DEFAULT 'face' CHECK (angle IN ('face','dos','defaut')),
+  position integer NOT NULL DEFAULT 0,
+  sha256 text NOT NULL,
+  captured_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_photos_item ON tyaga.item_photos(item_id);
+
+-- ============ ESTIMATIONS ============
+-- Historique : chaque demande = nouvelle ligne (EX-C4)
+CREATE TABLE IF NOT EXISTS tyaga.estimations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id uuid NOT NULL REFERENCES tyaga.items(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  price_suggested_cents integer NOT NULL,
+  price_min_cents integer NOT NULL,
+  price_max_cents integer NOT NULL,
+  delay_days_min integer NOT NULL,
+  delay_days_max integer NOT NULL,
+  commission_pct integer NOT NULL,            -- taux au moment T (traçabilité)
+  net_amount_cents integer NOT NULL,          -- calculé serveur
+  confidence text NOT NULL DEFAULT 'medium' CHECK (confidence IN ('low','medium','high')),
+  rationale text,
+  model_used text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_estimations_item ON tyaga.estimations(item_id);
+
+-- ============ ANNONCES ============
+CREATE TABLE IF NOT EXISTS tyaga.annonces (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_id uuid NOT NULL REFERENCES tyaga.items(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  estimation_id uuid REFERENCES tyaga.estimations(id) ON DELETE SET NULL,
+  title text NOT NULL,
+  description text NOT NULL,
+  tags text[] DEFAULT '{}',
+  price_cents integer NOT NULL,
+  status text NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft','validated','published','unpublished')),
+  user_validated boolean NOT NULL DEFAULT false,  -- EX-D2 : jamais published sans action user
+  published_at timestamptz,
+  export_text text,                          -- filet B : annonce texte prête à copier
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_annonces_status ON tyaga.annonces(status);
+
+-- ============ MARKPLACE_ORDERS ============
+-- Option C : paiement Stripe Connect, fonds séquestrés jusqu'à livraison
+CREATE TABLE IF NOT EXISTS tyaga.marketplace_orders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  annonce_id uuid NOT NULL REFERENCES tyaga.annonces(id) ON DELETE CASCADE,
+  item_id uuid NOT NULL REFERENCES tyaga.items(id) ON DELETE CASCADE,
+  buyer_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  seller_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  amount_cents integer NOT NULL CHECK (amount_cents > 0),
+  commission_pct integer NOT NULL,
+  commission_amount_cents integer NOT NULL,
+  net_amount_cents integer NOT NULL,
+  status text NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','paid','shipped','delivered','completed','cancelled')),
+  escrow_status text NOT NULL DEFAULT 'none'
+    CHECK (escrow_status IN ('none','held','released','refunded')),
+  stripe_payment_intent_id text,
+  stripe_transfer_id text,
+  shipping_address jsonb,                    -- visible vendeur UNIQUEMENT après paid (EX-G2)
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT buyer_neq_seller CHECK (buyer_id <> seller_id)  -- EX-E1
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_buyer ON tyaga.marketplace_orders(buyer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_seller ON tyaga.marketplace_orders(seller_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON tyaga.marketplace_orders(status);
+-- Idempotence webhook (EX-E4)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_payment_intent ON tyaga.marketplace_orders(stripe_payment_intent_id) WHERE stripe_payment_intent_id IS NOT NULL;
+
+-- ============ VENTES ============
+CREATE TABLE IF NOT EXISTS tyaga.ventes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL UNIQUE REFERENCES tyaga.marketplace_orders(id) ON DELETE CASCADE,
+  seller_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  gross_amount_cents integer NOT NULL,
+  commission_amount_cents integer NOT NULL,   -- EX-E2 tracé
+  net_amount_cents integer NOT NULL,
+  fiscal_year integer NOT NULL,               -- compteur EX-J7 (requête, pas table dédiée D14)
+  completed_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ventes_seller ON tyaga.ventes(seller_id);
+
+-- ============ INBOX ============
+CREATE TABLE IF NOT EXISTS tyaga.conversations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  annonce_id uuid NOT NULL REFERENCES tyaga.annonces(id) ON DELETE CASCADE,
+  buyer_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  seller_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (annonce_id, buyer_id)
+);
+
+CREATE TABLE IF NOT EXISTS tyaga.inbox_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id uuid NOT NULL REFERENCES tyaga.conversations(id) ON DELETE CASCADE,
+  sender_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+  flagged_off_platform boolean NOT NULL DEFAULT false,  -- EX-F4
+  flag_reason text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_conv ON tyaga.inbox_messages(conversation_id);
+
+-- Suggestions 1-cic proposées (jamais auto-envoyées — EX-F2)
+CREATE TABLE IF NOT EXISTS tyaga.inbox_suggestions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id uuid NOT NULL REFERENCES tyaga.conversations(id) ON DELETE CASCADE,
+  item_id uuid REFERENCES tyaga.items(id) ON DELETE CASCADE,
+  suggestion_type text NOT NULL CHECK (suggestion_type IN ('answer','negotiate','accept','decline')),
+  price_counter_cents integer,
+  body text NOT NULL,
+  used boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- ============ VIDA VAULT (SANDBOX — points, 0 virement réel V1) ============
+CREATE TABLE IF NOT EXISTS tyaga.vida_wallet (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  balance_points integer NOT NULL DEFAULT 0,   -- 1 pt = 1€ net vendeur
+  total_earned_points integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS tyaga.vida_transfers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  vente_id uuid REFERENCES tyaga.ventes(id) ON DELETE SET NULL,
+  objectif_id uuid,
+  pct integer NOT NULL CHECK (pct IN (0,30,50,100)),   -- EX-H2
+  points_amount integer NOT NULL,
+  status text NOT NULL DEFAULT 'proposed'
+    CHECK (status IN ('proposed','confirmed','cancelled')),  -- EX-H3 confirmation user
+  confirmed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfers_user ON tyaga.vida_transfers(user_id);
+
+CREATE TABLE IF NOT EXISTS tyaga.vida_objectifs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  type text NOT NULL CHECK (type IN ('vida_subscription','soin','investissement','autre')),
+  label text NOT NULL,
+  target_points integer NOT NULL CHECK (target_points > 0),
+  current_points integer NOT NULL DEFAULT 0,
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_objectifs_user ON tyaga.vida_objectifs(user_id);
+
+-- ============ UNIVERSNELS (P3) ============
+CREATE TABLE IF NOT EXISTS tyaga.referrals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  referrer_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  referred_id uuid NOT NULL UNIQUE REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  code text NOT NULL,
+  commission_paid boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- ============ updated_at trigger ============
+CREATE OR REPLACE FUNCTION tyaga.touch_updated_at()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
+
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['profiles','items','annonces','marketplace_orders','conversations','vida_wallet','vida_objectifs']
+  LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS touch_%1$s ON tyaga.%1$s', t);
+    EXECUTE format('CREATE TRIGGER touch_%1$s BEFORE UPDATE ON tyaga.%1$s FOR EACH ROW EXECUTE FUNCTION tyaga.touch_updated_at()', t);
+  END LOOP;
+END $$;
+
+-- ============ RLS (100% tables) ============
+ALTER TABLE tyaga.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.item_photos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.estimations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.annonces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.marketplace_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.ventes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.inbox_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.inbox_suggestions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.vida_wallet ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.vida_transfers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.vida_objectifs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tyaga.referrals ENABLE ROW LEVEL SECURITY;
+
+-- PROFILES
+DROP POLICY IF EXISTS profiles_select ON tyaga.profiles;
+CREATE POLICY profiles_select ON tyaga.profiles FOR SELECT USING (id = auth.uid() OR is_super_admin);
+DROP POLICY IF EXISTS profiles_update ON tyaga.profiles;
+CREATE POLICY profiles_update ON tyaga.profiles FOR UPDATE USING (id = auth.uid());
+
+-- ITEMS : owner tout, published lisible authentifiés
+DROP POLICY IF EXISTS items_select ON tyaga.items;
+CREATE POLICY items_select ON tyaga.items FOR SELECT
+  USING (user_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM tyaga.annonces a WHERE a.item_id = items.id AND a.status = 'published'));
+DROP POLICY IF EXISTS items_insert ON tyaga.items;
+CREATE POLICY items_insert ON tyaga.items FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS items_update ON tyaga.items;
+CREATE POLICY items_update ON tyaga.items FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS items_delete ON tyaga.items;
+CREATE POLICY items_delete ON tyaga.items FOR DELETE USING (user_id = auth.uid());
+
+-- ITEM_PHOTOS : owner
+DROP POLICY IF EXISTS photos_select ON tyaga.item_photos;
+CREATE POLICY photos_select ON tyaga.item_photos FOR SELECT
+  USING (user_id = auth.uid()
+    OR EXISTS (SELECT 1 FROM tyaga.items i JOIN tyaga.annonces a ON a.item_id = i.id
+               WHERE i.id = item_photos.item_id AND a.status = 'published'));
+DROP POLICY IF EXISTS photos_insert ON tyaga.item_photos;
+CREATE POLICY photos_insert ON tyaga.item_photos FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS photos_delete ON tyaga.item_photos;
+CREATE POLICY photos_delete ON tyaga.item_photos FOR DELETE USING (user_id = auth.uid());
+
+-- ESTIMATIONS : owner
+DROP POLICY IF EXISTS estimations_select ON tyaga.estimations;
+CREATE POLICY estimations_select ON tyaga.estimations FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS estimations_insert ON tyaga.estimations;
+CREATE POLICY estimations_insert ON tyaga.estimations FOR INSERT WITH CHECK (user_id = auth.uid());
+
+-- ANNONCES : owner CRUD, published lisible authentifiés (EX-D3)
+DROP POLICY IF EXISTS annonces_select ON tyaga.annonces;
+CREATE POLICY annonces_select ON tyaga.annonces FOR SELECT
+  USING (user_id = auth.uid() OR status = 'published');
+DROP POLICY IF EXISTS annonces_insert ON tyaga.annonces;
+CREATE POLICY annonces_insert ON tyaga.annonces FOR INSERT WITH CHECK (user_id = auth.uid() AND user_validated = true);
+DROP POLICY IF EXISTS annonces_update ON tyaga.annonces;
+CREATE POLICY annonces_update ON tyaga.annonces FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS annonces_delete ON tyaga.annonces;
+CREATE POLICY annonces_delete ON tyaga.annonces FOR DELETE USING (user_id = auth.uid());
+
+-- ORDERS : buyer ou seller (EX-E3 RLS par partie)
+DROP POLICY IF EXISTS orders_select ON tyaga.marketplace_orders;
+CREATE POLICY orders_select ON tyaga.marketplace_orders FOR SELECT
+  USING (buyer_id = auth.uid() OR seller_id = auth.uid());
+DROP POLICY IF EXISTS orders_insert ON tyaga.marketplace_orders;
+CREATE POLICY orders_insert ON tyaga.marketplace_orders FOR INSERT
+  WITH CHECK (buyer_id = auth.uid() AND status = 'pending');
+-- Transitions : buyer peut payer/annuler-avant-paiement, seller peut shipper, buyer peut confirmer réception
+DROP POLICY IF EXISTS orders_update ON tyaga.marketplace_orders;
+CREATE POLICY orders_update ON tyaga.marketplace_orders FOR UPDATE
+  USING (buyer_id = auth.uid() OR seller_id = auth.uid())
+  WITH CHECK (buyer_id = auth.uid() OR seller_id = auth.uid());
+
+-- VENTES : seller (lecteur), écritures serveur uniquement (service role bypass RLS)
+DROP POLICY IF EXISTS ventes_select ON tyaga.ventes;
+CREATE POLICY ventes_select ON tyaga.ventes FOR SELECT USING (seller_id = auth.uid());
+
+-- CONVERSATIONS/MESSAGES : participants
+DROP POLICY IF EXISTS convs_select ON tyaga.conversations;
+CREATE POLICY convs_select ON tyaga.conversations FOR SELECT
+  USING (buyer_id = auth.uid() OR seller_id = auth.uid());
+DROP POLICY IF EXISTS convs_insert ON tyaga.conversations;
+CREATE POLICY convs_insert ON tyaga.conversations FOR INSERT WITH CHECK (buyer_id = auth.uid());
+DROP POLICY IF EXISTS msgs_select ON tyaga.inbox_messages;
+CREATE POLICY msgs_select ON tyaga.inbox_messages FOR SELECT
+  USING (EXISTS (SELECT 1 FROM tyaga.conversations c
+                 WHERE c.id = conversation_id AND (c.buyer_id = auth.uid() OR c.seller_id = auth.uid())));
+DROP POLICY IF EXISTS msgs_insert ON tyaga.inbox_messages;
+CREATE POLICY msgs_insert ON tyaga.inbox_messages FOR INSERT
+  WITH CHECK (sender_id = auth.uid()
+    AND EXISTS (SELECT 1 FROM tyaga.conversations c
+                WHERE c.id = conversation_id AND (c.buyer_id = auth.uid() OR c.seller_id = auth.uid())));
+
+-- SUGGESTIONS : participant lecture
+DROP POLICY IF EXISTS sugg_select ON tyaga.inbox_suggestions;
+CREATE POLICY sugg_select ON tyaga.inbox_suggestions FOR SELECT
+  USING (EXISTS (SELECT 1 FROM tyaga.conversations c
+                 WHERE c.id = conversation_id AND (c.buyer_id = auth.uid() OR c.seller_id = auth.uid())));
+DROP POLICY IF EXISTS sugg_update ON tyaga.inbox_suggestions;
+CREATE POLICY sugg_update ON tyaga.inbox_suggestions FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM tyaga.conversations c
+                 WHERE c.id = conversation_id AND (c.buyer_id = auth.uid() OR c.seller_id = auth.uid())));
+
+-- VIDA : owner
+DROP POLICY IF EXISTS wallet_select ON tyaga.vida_wallet;
+CREATE POLICY wallet_select ON tyaga.vida_wallet FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS transfers_select ON tyaga.vida_transfers;
+CREATE POLICY transfers_select ON tyaga.vida_transfers FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS transfers_insert ON tyaga.vida_transfers;
+CREATE POLICY transfers_insert ON tyaga.vida_transfers FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS transfers_update ON tyaga.vida_transfers;
+CREATE POLICY transfers_update ON tyaga.vida_transfers FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS objectifs_select ON tyaga.vida_objectifs;
+CREATE POLICY objectifs_select ON tyaga.vida_objectifs FOR SELECT USING (user_id = auth.uid());
+DROP POLICY IF EXISTS objectifs_insert ON tyaga.vida_objectifs;
+CREATE POLICY objectifs_insert ON tyaga.vida_objectifs FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS objectifs_update ON tyaga.vida_objectifs;
+CREATE POLICY objectifs_update ON tyaga.vida_objectifs FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS objectifs_delete ON tyaga.vida_objectifs;
+CREATE POLICY objectifs_delete ON tyaga.vida_objectifs FOR DELETE USING (user_id = auth.uid());
+
+-- REFERRALS : referrer
+DROP POLICY IF EXISTS referrals_select ON tyaga.referrals;
+CREATE POLICY referrals_select ON tyaga.referrals FOR SELECT USING (referrer_id = auth.uid());
+DROP POLICY IF EXISTS referrals_insert ON tyaga.referrals;
+CREATE POLICY referrals_insert ON tyaga.referrals FOR INSERT WITH CHECK (referrer_id = auth.uid());
+
+-- ============ STORAGE ============
+-- Bucket tyaga-photos : upload owner {user_id}/..., lecture annonces publiées
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('tyaga-photos', 'tyaga-photos', false)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS tyaga_photos_insert ON storage.objects;
+CREATE POLICY tyaga_photos_insert ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'tyaga-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS tyaga_photos_select ON storage.objects;
+CREATE POLICY tyaga_photos_select ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'tyaga-photos');
+
+DROP POLICY IF EXISTS tyaga_photos_delete ON storage.objects;
+CREATE POLICY tyaga_photos_delete ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'tyaga-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ============ EXPOSER LE SCHÉMA À POSTGREST ============
+-- À exécuter si nécessaire (normalement déjà couvert par PGRST_DB_SCHEMAS au niveau serveur) :
+-- ALTER DATABASE postgres SET pgrst.db_schemas = 'public, storage, tyaga, ...';

@@ -1,0 +1,20 @@
+# DECISIONS.md — TYAGA
+
+Format : `D# — AAAA-MM-JJ — décision · raison`. Ambiguïté BRIEF/docs → choix par défaut consigné ici, jamais de question bloquante (VEGA).
+
+- **D1 — 2026-08-24 — Autorités design = design.md V5 + PURAMA_MASTER_UPGRADE Design System V1 + CLAUDE.md §15** · Le BRIEF renvoie à « CLAUDE-2 §9/9bis/9ter », sections partiellement fantôme dans CLAUDE-2.md ; les trois autorités citées couvrent intégralement le besoin (GOD MODE V5, palette_seed déterministe, interdits).
+- **D2 — 2026-08-24 — palette_seed = `warmth-community-tyaga`** · TYAGA absent du mapping PART 3 ; mood warmth-community (corail/orange, consommateur type Vinted/Back Market), modifier null ('festive' hors tonalité lâcher-prise). **Confirmé par Tissma** via « ok » sur le plan (exigence PART 3 satisfaite).
+- **D3 — 2026-08-24 — Créations propres pour les absences** · TYAGA absent de : fonts design.md, variantes domaine, mapping cross-promo, CPA par app, SYSTEM_PROMPTS CLAUDE-2, header KARMA. Créé : typo Bricolage Grotesque (display, 0 collision sur 17 apps), variante domaine « revente/marketplace consumer », cross-promo TYAGA→VIDA,KASH, persona IA « TyagaIA » expert revente. KARMA : pas d'intégration V1 (module wellness, TYAGA hors périmètre).
+- **D4 — 2026-08-24 — Secrets → `.env.local`/`.env.secrets` uniquement** · CLAUDE-2.md contient des secrets LIVE en clair (sk_live, sk-ant, github_pat, POSTGRES_PASSWORD…). Jamais recopiés dans un fichier tracké ni exposé client ; seul `NEXT_PUBLIC_*` exposé.
+- **D5 — 2026-08-24 — Repo git dédié local dans tyaga/, remote GitHub `puramapro-oss/purama-tyaga` différé au feu vert** · DoD BRIEF : « commits locaux uniquement sauf feu vert ». Deploy preview via `vercel` CLI (déploie le dir local, 0 push git).
+- **D6 — 2026-08-24 — CLAUDE.md = copie réelle, pas symlink** · Le script du moule symlink vers `../CLAUDE.md`, mais repo dédié → symlink cassé une fois poussé. Copie réelle (identique au core 2026-08-24), drift acceptable pour un repo isolé.
+- **D7 — 2026-08-24 — Geist Sans (body) + Bricolage Grotesque (display)** · Conflit « Geist exclusif » (Design System V1) vs « typo signature unique » (GOD MODE V5) : Geist reste la base utilitaire, la signature vient du display.
+- **D8 — 2026-08-24 — BRIEF + VEGA Pilier 21 priment sur l'arsenal CLAUDE-2 #74** · V1-CORE strict ; V2/V3 tracés en V1.1-BACKLOG.
+- **D9 — 2026-08-24 — Split KARMA : 50/10/40 (V13 §9.1) gagne** · Doc V4.1 flux « 50/10/10/30 » obsolète, V13 registre d'autorité. (Non pertinent V1 TYAGA : pas d'abonnement, commission vente uniquement.)
+- **D10 — 2026-08-24 — Schéma Postgres DÉDIÉ `tyaga` (pas `purama_marketplace`)** · Pilier 18 D-007 impose le schéma partagé UNIQUEMENT aux marketplaces clonées du moule prestataires (gardiens/réservations/séquestre). TYAGA = revente C2C, tables métier disjointes (items, estimations, annonces, ventes, vida_wallet). CLAUDE.md V13 §12 (autorité) : 1 schéma par app → `tyaga`.
+- **D11 — 2026-08-24 — App self-contained, 0 dépendance runtime `@purama/*`** · Moule = structure + patterns (constaté sur PASHU : 0 dep runtime @purama/*). Compatible repo dédié GitHub. `@purama/eslint-config` (file:) remplacé par config eslint locale.
+- **D12 — 2026-08-24 — Next.js 15 (BRIEF impose) et non 16 (PASHU)** · BRIEF §0 = contrat stack. React 19 OK.
+- **D13 — 2026-08-24 — Commission V1 = 10% flat, env `TYAGA_COMMISSION_PCT`** · BRIEF §7 fourchette 5-10% → haut de fourchette pour absorber frais Stripe + séquestre ; affichée avant publication (non-négociable BRIEF §1).
+- **D14 — 2026-08-24 — Fiscal V1 = requête calculée, pas de table** · Compteur annuel = SUM(ventes nettes vendeur, année civile) + alerte UI à 250€ (seuil déclaration 305€). Pattern V4.1 Tax Assistant flow occasionnel, allégé.
+- **D15 — 2026-08-24 — Expédition V1 = statuts manuels (envoyé/livré), pas d'intégration transporteur** · BRIEF §2.5 : « étiquette SI transporteur intégré » — aucun intégré V1, checklist + suivi manuel.
+- **D16 — 2026-08-24 — Paiement achat = Stripe Connect séquestre via webhook partagé, idempotence `event_id`** · Pattern Pilier 15 backups : toute nouvelle app hérite du webhook Stripe partagé + idempotence.
