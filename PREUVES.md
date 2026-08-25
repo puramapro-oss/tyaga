@@ -67,3 +67,21 @@ FINAL : `completed \| released` + commission 450 / net 4050 (ordre test 4500). N
 
 ### Qualité
 - `tsc --noEmit` exit=0 (spec e2e incluse) · `next build` 0 (segment précédent, inchangé) · unit 17/17.
+
+## P2.5 — EX-G Expédition guidée ✅ (2026-08-25)
+
+### Audit d'état (avant code)
+- EX-G2 adresse post-paiement : déjà en place P2.3 (`commandes/page.tsx` — bloc adresse si `role=seller && status ∉ {pending, cancelled}` ; p4 e2e avait prouvé l'absence avant paiement).
+- EX-G3 suivi manuel : déjà en place P2.3 (`CommandeActions` + `/api/orders/[id]/transition` + `finalizeCompletedSale` → completed+released+ventes).
+- EX-G1 checklist : MANQUANT → `PackingChecklist.tsx` créé (6 étapes concrètes > 4+ exigées, progression localStorage par commande, jamais partagée) ; rendu si `role=seller && status==='paid'`.
+
+### e2e p6 (`e2e/p6-expedition.spec.ts` PASSED 29.8s, 1 worker)
+- Parcours complet 2 comptes réels : publication → achat réel jusqu'à `checkout.stripe.com` (aucune carte saisie) → commande `pending` visible acheteur.
+- Paiement simulé côté système (service PostgREST PATCH `marketplace_orders` → `status=paid, escrow_status=held`, rôle webhook karma — réel paiement interdit en test).
+- EX-G1 : vendeur `/commandes` → « Vente · Payée » + `section[aria-label="Emballage avant envoi"]` + « 0/6 étapes » → coche Étape 1 → « 1/6 étapes ».
+- EX-G2 : « Adresse de livraison » + « Alex Acheteur » visibles vendeur UNIQUEMENT à ce stade (payée).
+- EX-G3 : « Objet expédié » → « Vente · Expédiée » + checklist disparue → acheteur « J'ai bien reçu l'objet » → « Achat · Terminée » + « Vendeur payé ».
+- Preuve SQL PostgREST (`Accept-Profile: tyaga`) : ordre = `status=completed`, `escrow_status=released`.
+
+### Qualité
+- `tsc --noEmit` exit=0 · `next build` 0 · unit 17/17.

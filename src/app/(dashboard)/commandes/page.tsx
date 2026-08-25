@@ -2,6 +2,7 @@ import { Package } from 'lucide-react';
 import Link from 'next/link';
 
 import CommandeActions from '@/components/marketplace/CommandeActions';
+import PackingChecklist from '@/components/marketplace/PackingChecklist';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { formatDate, formatPrice } from '@/lib/utils';
 
@@ -144,6 +145,10 @@ export default async function CommandesPage({
                     {o.shipping_address.country}
                   </div>
                 )}
+
+              {o.role === 'seller' && o.status === 'paid' && (
+                <PackingChecklist orderId={o.id} />
+              )}
 
               <CommandeActions orderId={o.id} status={o.status} role={o.role} />
             </li>
