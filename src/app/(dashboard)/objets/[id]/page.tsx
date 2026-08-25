@@ -2,6 +2,7 @@ import { ArrowLeft, Clock, Sparkles, Tag } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import AnnoncePanel from '@/components/objets/AnnoncePanel';
 import EstimatePanel from '@/components/objets/EstimatePanel';
 import { CONDITION_LABELS, STATUS_LABELS } from '@/lib/labels';
 import { createServiceClient } from '@/lib/service';
@@ -61,6 +62,14 @@ export default async function ItemPage({
       return { url: data?.signedUrl ?? null, alt: PHOTO_ALTS[p.position] ?? PHOTO_ALTS[i] };
     })
   );
+
+  // EX-D3 : l'annonce publiée (une seule active par objet)
+  const { data: annonce } = await supabase
+    .from('annonces')
+    .select('id, title, export_text')
+    .eq('item_id', item.id)
+    .eq('status', 'published')
+    .maybeSingle();
 
   const latest = estimations?.[0] ?? null;
   const status = STATUS_LABELS[item.status] ?? {
@@ -196,6 +205,12 @@ export default async function ItemPage({
       )}
 
       <EstimatePanel itemId={item.id} alreadyEstimated={Boolean(latest)} />
+
+      <AnnoncePanel
+        itemId={item.id}
+        estimationAvailable={Boolean(latest)}
+        annonce={annonce ?? null}
+      />
 
       {estimations && estimations.length > 1 && (
         <section className="glass flex flex-col gap-3 p-6">

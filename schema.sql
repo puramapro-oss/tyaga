@@ -324,11 +324,22 @@ CREATE POLICY orders_select ON tyaga.marketplace_orders FOR SELECT
 DROP POLICY IF EXISTS orders_insert ON tyaga.marketplace_orders;
 CREATE POLICY orders_insert ON tyaga.marketplace_orders FOR INSERT
   WITH CHECK (buyer_id = auth.uid() AND status = 'pending');
--- Transitions : buyer peut payer/annuler-avant-paiement, seller peut shipper, buyer peut confirmer réception
+-- EX-E3 — transitions par partie uniquement (USING = état AVANT, WITH CHECK = état APRÈS) :
+--   buyer  : pending→cancelled, shipped→delivered
+--   seller : paid→shipped
+--   system (service role, bypass RLS) : pending→paid, delivered→completed, remboursements
 DROP POLICY IF EXISTS orders_update ON tyaga.marketplace_orders;
 CREATE POLICY orders_update ON tyaga.marketplace_orders FOR UPDATE
-  USING (buyer_id = auth.uid() OR seller_id = auth.uid())
-  WITH CHECK (buyer_id = auth.uid() OR seller_id = auth.uid());
+  USING (
+       (buyer_id = auth.uid()  AND status = 'pending')
+    OR (buyer_id = auth.uid()  AND status = 'shipped')
+    OR (seller_id = auth.uid() AND status = 'paid')
+  )
+  WITH CHECK (
+       (buyer_id = auth.uid()  AND status = 'cancelled')
+    OR (buyer_id = auth.uid()  AND status = 'delivered')
+    OR (seller_id = auth.uid() AND status = 'shipped')
+  );
 
 -- VENTES : seller (lecteur), écritures serveur uniquement (service role bypass RLS)
 DROP POLICY IF EXISTS ventes_select ON tyaga.ventes;
@@ -418,3 +429,22 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA tyaga GRANT ALL ON FUNCTIONS TO postgres,anon
 -- puis : cd /opt/supabase/docker && docker compose up -d --force-recreate rest
 -- Vérif : curl https://auth.purama.dev/rest/v1/profiles?select=id \
 --   -H "apikey: $ANON" -H "Accept-Profile: tyaga"  → 200 []
+
+-- ============ EX-E — MIGRATION MARKETPLACE PAIEMENT (appliquée VPS 2026-08-25) ============
+-- Idempotence webhook (dédup central karma + re-dédup local par sécurité)
+CREATE TABLE IF NOT EXISTS tyaga.stripe_events_processed (
+  event_id text PRIMARY KEY,
+  event_type text,
+  processed_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE tyaga.stripe_events_processed ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS stripe_events_all ON tyaga.stripe_events_processed;
+CREATE POLICY stripe_events_all ON tyaga.stripe_events_processed
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- Comptes Stripe du profil (client payment / vendeur Connect)
+ALTER TABLE tyaga.profiles ADD COLUMN IF NOT EXISTS stripe_customer_id text;
+ALTER TABLE tyaga.profiles ADD COLUMN IF NOT EXISTS stripe_connect_account_id text;
+
+-- Session Checkout par commande
+ALTER TABLE tyaga.marketplace_orders ADD COLUMN IF NOT EXISTS stripe_checkout_session_id text;

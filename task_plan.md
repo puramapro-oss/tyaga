@@ -12,19 +12,19 @@
 - [x] MANAS/apps/tyaga.md + ligne INDEX.md
 - [x] Premier commit local
 
-## P1 — Scaffold + design system + DB + auth ❌
-- [ ] Next.js 15 + React 19 + TS strict + Tailwind + eslint local (0 dep runtime @purama/*)
-- [ ] /lib/brand/ : parseSeed xmur3 + palette warmth-community-tyaga + fonts (Bricolage+Geist) — 0 hex dur
-- [ ] Schéma `tyaga` sur VPS (SSH vérifié AVANT) : tables + RLS + trigger profile + bucket `tyaga-photos`
-- [ ] .env.local (monorepo §5 + .env.secrets — jamais tracké)
-- [ ] Auth email + Google OAuth EN VRAI (VPS: GOTRUE_EXTERNAL_GOOGLE_ENABLED + URI_ALLOW_LIST + restart AVANT test)
-- [ ] Middleware (dashboard→login?next=) + signOut+clear+redirect
-- [ ] Deploy preview Vercel CLI + DNS tyaga.purama.dev
+## P1 — Scaffold + design system + DB + auth ✅
+- [x] Next.js 15 + React 19 + TS strict + Tailwind + eslint local (0 dep runtime @purama/*)
+- [x] /lib/brand/ : parseSeed xmur3 + palette warmth-community-tyaga + fonts (Bricolage+Geist) — 0 hex dur
+- [x] Schéma `tyaga` sur VPS (SSH vérifié AVANT) : tables + RLS + trigger profile + bucket `tyaga-photos`
+- [x] .env.local (monorepo §5 + .env.secrets — jamais tracké)
+- [x] Auth email + Google OAuth EN VRAI (VPS: GOTRUE_EXTERNAL_GOOGLE_ENABLED + URI_ALLOW_LIST + restart AVANT test)
+- [x] Middleware (dashboard→login?next=) + signOut+clear+redirect
+- [x] Deploy preview Vercel CLI + DNS tyaga.purama.dev
 
-## P2 — Features core V1 (1/1, testée, déployée) ❌
-- [ ] P2.1 Scan 3 photos + IA vision sonnet-4-6 (/api/scan) — EX-B
+## P2 — Features core V1 (1/1, testée, déployée) ⏳
+- [x] P2.1 Scan 3 photos + IA vision sonnet-4-6 (/api/scan) — EX-B ✅
 - [x] P2.2 Estimation + net commission serveur (/api/estimate) — EX-C ✅ (6/6 e2e, 10 rows SQL pct=10 net exact, append-only prouvé)
-- [ ] P2.3 Annonce assistée (/api/listing/generate) + publication marketplace C + Stripe Connect webhook partagé + export texte filet B — EX-D/E
+- [x] P2.3 Annonce assistée (/api/annonces/generate) + publication marketplace C + Stripe Connect webhook partagé + export texte filet B — EX-D/E ✅ (p4 e2e 1/1: publish→achat→checkout Stripe live→pending→cancel; matrice RLS 13/13 VERT cf PREUVES.md; tsc 0 build 0; unit 5/5)
 - [ ] P2.4 Inbox assistant + anti-fraude (1-clic jamais auto, plancher, regex hors plateforme) — EX-F
 - [ ] P2.5 Expédition guidée (checklist, adresse post-paiement, statuts manuels) — EX-G
 - [ ] P2.6 Vida Vault sandbox (points 1pt=1€, 0/30/50/100%, objectifs CRUD) — EX-H
@@ -58,3 +58,4 @@
 ---
 ## Journal
 - 2026-08-24 — P0 terminé. Option C confirmée par Tissma. 0 code, docs complets.
+- 2026-08-25 — P1 ✅ (scaffold+DB+auth+deploy preview). P2.1/P2.2 ✅. P2.3 EX-D+EX-E ✅ : e2e p4 (achat→checkout live→annulation), matrice RLS 13/13 VERT (PREUVES.md), karma registry `tyaga` branché.
