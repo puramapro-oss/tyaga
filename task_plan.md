@@ -58,4 +58,4 @@
 ---
 ## Journal
 - 2026-08-24 — P0 terminé. Option C confirmée par Tissma. 0 code, docs complets.
-- 2026-08-25 — P1 ✅ (scaffold+DB+auth+deploy preview). P2.1/P2.2 ✅. P2.3 EX-D+EX-E ✅ : e2e p4 (achat→checkout live→annulation), matrice RLS 13/13 VERT (PREUVES.md), karma registry `tyaga` branché.
+- 2026-08-25 — P1 ✅ (scaffold+DB+auth+deploy preview). P2.1/P2.2 ✅. P2.3 EX-D+EX-E ✅ : e2e p4 (achat→checkout live→annulation), matrice RLS 13/13 VERT (PREUVES.md), karma registry `tyaga` branché. **Deploy PROD** ✅ `https://tyaga.purama.dev` (dpl_Ue2SZFpkVBoUAp4EDC79iJcdnHAN, 11 env vars, smoke / 200 · /login 200 · /marketplace 307→login).
