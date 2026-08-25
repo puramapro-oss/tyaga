@@ -1,0 +1,41 @@
+{
+  "name": "tyaga",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint src --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
+    "@supabase/ssr": "^0.12.4",
+    "@supabase/supabase-js": "^2.48.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^13.1.1",
+    "lucide-react": "^1.30.0",
+    "next": "^15.5.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "resend": "^6.22.0",
+    "server-only": "^0.0.1",
+    "stripe": "^22.4.0",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
+    "@types/node": "^22.13.7",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.0",
+    "@typescript-eslint/parser": "^8.66.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.30.0",
+    "eslint-config-next": "^15.5.0",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3"
+  }
+}

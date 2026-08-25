@@ -402,6 +402,19 @@ DROP POLICY IF EXISTS tyaga_photos_delete ON storage.objects;
 CREATE POLICY tyaga_photos_delete ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'tyaga-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
 
--- ============ EXPOSER LE SCHÉMA À POSTGREST ============
--- À exécuter si nécessaire (normalement déjà couvert par PGRST_DB_SCHEMAS au niveau serveur) :
--- ALTER DATABASE postgres SET pgrst.db_schemas = 'public, storage, tyaga, ...';
+-- ============ GRANTS POSTGREST (OBLIGATOIRE — sinon 42501 permission denied) ============
+GRANT USAGE ON SCHEMA tyaga TO postgres,anon,authenticated,service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA tyaga TO postgres,anon,authenticated,service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA tyaga TO postgres,anon,authenticated,service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA tyaga TO postgres,anon,authenticated,service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA tyaga GRANT ALL ON TABLES TO postgres,anon,authenticated,service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA tyaga GRANT ALL ON SEQUENCES TO postgres,anon,authenticated,service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA tyaga GRANT ALL ON FUNCTIONS TO postgres,anon,authenticated,service_role;
+
+-- ============ EXPOSITION POSTGREST (VPS auth.purama.dev) ============
+-- Le schéma est exposé par le GUC du rôle `authenticator` (prioritaire sur
+-- PGRST_DB_SCHEMAS du .env docker) — vérifié sur TYAGA 2026-08-25 :
+--   ALTER ROLE authenticator SET pgrst.db_schemas = '<liste complète + tyaga>';
+-- puis : cd /opt/supabase/docker && docker compose up -d --force-recreate rest
+-- Vérif : curl https://auth.purama.dev/rest/v1/profiles?select=id \
+--   -H "apikey: $ANON" -H "Accept-Profile: tyaga"  → 200 []
