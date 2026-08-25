@@ -50,3 +50,20 @@ Commande : `sshpass … ssh root@72.62.191.111 "docker exec -i supabase-db psql 
 FINAL : `completed \| released` + commission 450 / net 4050 (ordre test 4500). Nettoyage : `DELETE 1` + ordre orphelin v3 supprimé (remaining = 1 commande e2e légitime annulée).
 
 **13/13 VERT.** Séquence complète `pending → paid → shipped → delivered → completed` uniquement par la bonne partie (acheteur annule/reçoit, vendeur expédie, système paie/clôture) ; impersonnation `SET LOCAL ROLE authenticated` + `request.jwt.claims`.
+
+## P2.4 — EX-F Inbox assistant + anti-fraude ✅ (2026-08-25)
+
+### Unitaires (`tests/inbox.test.ts` 12/12 + `tests/order-transitions.test.ts` 5/5 = 17/17, exit=0)
+- EX-F4 : détection IBAN / PayPal / WhatsApp+Telegram+Revolut+Lydia / tél FR (+33, 0X) / email / RIB FR ; message normal passe.
+- EX-F2 : acheteur = 3 suggestions sans montant ; vendeur sans offre = 2 réponses d'accueil.
+- EX-F3 : offre < plancher → refus poli proposé (jamais de contre < plancher) ; contre-offre = plancher exact ; offre ≥ plancher → acceptation au montant offert.
+
+### e2e p5 (`e2e/p5-inbox.spec.ts` PASSED 34.0s, 1 worker)
+- Parcours 2 comptes réels (seller/buyer confirmés via admin API) : publication annonce → plancher 60 € enregistré (`Enregistré`).
+- EX-F1 : acheteur contacte depuis marketplace → fil `/messages/[id]` persisté, refresh vendeur `/messages` → lien visible.
+- EX-F2 : suggestion acheteur « toujours disponible ? » envoyée UNIQUEMENT sur clic ; envoi explicite via composer.
+- EX-F3 : offre 50 € < plancher → vendeur voit « Offre : 50 » + puce Négocier contre-propos chiffré 60 € (= plancher exact, `span.font-mono`) + clic Refuser → « Je ne descends pas sous 60 € ».
+- EX-F4 : message « PayPal » acheteur → bloqué, avertissement FR « Message bloqué : PayPal détecté » ; vendeur (après reload) ne voit JAMAIS le message (RLS) ; preuve SQL PostgREST `Accept-Profile: tyaga` : dernier `inbox_messages` = body contient « PayPal », `flagged_off_platform = true`.
+
+### Qualité
+- `tsc --noEmit` exit=0 (spec e2e incluse) · `next build` 0 (segment précédent, inchangé) · unit 17/17.

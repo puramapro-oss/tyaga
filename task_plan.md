@@ -25,7 +25,7 @@
 - [x] P2.1 Scan 3 photos + IA vision sonnet-4-6 (/api/scan) — EX-B ✅
 - [x] P2.2 Estimation + net commission serveur (/api/estimate) — EX-C ✅ (6/6 e2e, 10 rows SQL pct=10 net exact, append-only prouvé)
 - [x] P2.3 Annonce assistée (/api/annonces/generate) + publication marketplace C + Stripe Connect webhook partagé + export texte filet B — EX-D/E ✅ (p4 e2e 1/1: publish→achat→checkout Stripe live→pending→cancel; matrice RLS 13/13 VERT cf PREUVES.md; tsc 0 build 0; unit 5/5)
-- [ ] P2.4 Inbox assistant + anti-fraude (1-clic jamais auto, plancher, regex hors plateforme) — EX-F
+- [x] P2.4 Inbox assistant + anti-fraude (1-clic jamais auto, plancher, regex hors plateforme) — EX-F ✅ (unit 17/17, e2e p5 1/1 34s, flagged_off_platform SQL prouvé — PREUVES.md)
 - [ ] P2.5 Expédition guidée (checklist, adresse post-paiement, statuts manuels) — EX-G
 - [ ] P2.6 Vida Vault sandbox (points 1pt=1€, 0/30/50/100%, objectifs CRUD) — EX-H
 - [ ] Fiscal compteur + alerte 250€ — EX-J7
@@ -59,3 +59,4 @@
 ## Journal
 - 2026-08-24 — P0 terminé. Option C confirmée par Tissma. 0 code, docs complets.
 - 2026-08-25 — P1 ✅ (scaffold+DB+auth+deploy preview). P2.1/P2.2 ✅. P2.3 EX-D+EX-E ✅ : e2e p4 (achat→checkout live→annulation), matrice RLS 13/13 VERT (PREUVES.md), karma registry `tyaga` branché. **Deploy PROD** ✅ `https://tyaga.purama.dev` (dpl_Ue2SZFpkVBoUAp4EDC79iJcdnHAN, 11 env vars, smoke / 200 · /login 200 · /marketplace 307→login).
+- 2026-08-25 — P2.4 EX-F ✅ : inbox temps réel (poll 5s) + suggestions 1-clic (jamais auto) + plancher vendeur (refus poli sous plancher, contre = plancher exact) + regex anti-hors-plateforme (IBAN/RIB/PayPal/WhatsApp/Telegram/Revolut/Lydia/tél/email) message bloqué + `flagged_off_platform`. Unit 17/17 · tsc 0 · e2e p5 1/1 (34s, 2 comptes, preuve SQL PostgREST).

@@ -2,6 +2,7 @@ import { ArrowLeft, Store } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import ContactButton from '@/components/inbox/ContactButton';
 import BuyPanel from '@/components/marketplace/BuyPanel';
 import { CONDITION_LABELS } from '@/lib/labels';
 import { createServiceClient } from '@/lib/service';
@@ -142,7 +143,11 @@ export default async function AnnoncePage({
           C’est ton annonce : suis son déroulé depuis « Commandes ».
         </p>
       ) : (
-        <BuyPanel annonceId={annonce.id} priceCents={annonce.price_cents} />
+        <div className="flex flex-col gap-3">
+          <BuyPanel annonceId={annonce.id} priceCents={annonce.price_cents} />
+          {/* EX-F1 : messagerie interne — la question AVANT l'achat */}
+          <ContactButton annonceId={annonce.id} />
+        </div>
       )}
 
       <p className="flex items-center gap-2 text-xs text-foreground-muted">

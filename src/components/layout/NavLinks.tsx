@@ -1,11 +1,11 @@
 'use client';
 
-import { Camera, Home, Box, Package, Store } from 'lucide-react';
+import { Camera, Home, Box, MessageCircle, Package, Store } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 /**
- * Navigation app : Accueil, Scanner, Mes objets, Marketplace. Desktop = colonne,
+ * Navigation app : Accueil, Scanner, Mes objets, Marketplace, Messages. Desktop = colonne,
  * mobile = onglets bas. Actif = bg-card + aria-current.
  */
 
@@ -14,6 +14,7 @@ const LINKS = [
   { href: '/scan', label: 'Scanner', icon: Camera, exact: true },
   { href: '/objets', label: 'Mes objets', icon: Box, exact: true },
   { href: '/marketplace', label: 'Marketplace', icon: Store, exact: false },
+  { href: '/messages', label: 'Messages', icon: MessageCircle, exact: false },
   { href: '/commandes', label: 'Commandes', icon: Package, exact: true },
 ] as const;
 

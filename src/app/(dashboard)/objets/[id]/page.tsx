@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 
 import AnnoncePanel from '@/components/objets/AnnoncePanel';
 import EstimatePanel from '@/components/objets/EstimatePanel';
+import FloorPricePanel from '@/components/objets/FloorPricePanel';
 import { CONDITION_LABELS, STATUS_LABELS } from '@/lib/labels';
 import { createServiceClient } from '@/lib/service';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
@@ -31,7 +32,7 @@ export default async function ItemPage({
   const { data: item } = await supabase
     .from('items')
     .select(
-      'id, title, category, brand, model, condition, status, created_at'
+      'id, title, category, brand, model, condition, status, created_at, floor_price_cents'
     )
     .eq('id', id)
     .eq('user_id', user!.id)
@@ -210,6 +211,13 @@ export default async function ItemPage({
         itemId={item.id}
         estimationAvailable={Boolean(latest)}
         annonce={annonce ?? null}
+      />
+
+      {/* EX-F3 : plancher de négociation, utile dès l'estimation */}
+      <FloorPricePanel
+        itemId={item.id}
+        floorCents={item.floor_price_cents}
+        priceCents={latest?.price_suggested_cents ?? null}
       />
 
       {estimations && estimations.length > 1 && (
