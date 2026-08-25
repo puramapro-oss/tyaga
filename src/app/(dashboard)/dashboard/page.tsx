@@ -1,4 +1,5 @@
 import { Camera } from 'lucide-react';
+import Link from 'next/link';
 
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { formatDate } from '@/lib/utils';
@@ -22,7 +23,8 @@ export default async function DashboardPage() {
   const { count: itemCount } = await supabase
     .from('items')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', user!.id);
+    .eq('user_id', user!.id)
+    .neq('status', 'draft');
 
   const firstName =
     profile?.full_name?.split(' ')[0] || user!.email?.split('@')[0] || 'toi';
@@ -55,10 +57,18 @@ export default async function DashboardPage() {
           </div>
         </div>
         {itemCount === 0 && (
-          <p className="mt-4 border-t border-border pt-4 text-sm leading-relaxed text-foreground-secondary">
-            Aucun objet pour l’instant. Le scanner photo arrive avec la
-            prochaine étape — prends tes photos en attendant.
-          </p>
+          <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
+            <p className="text-sm leading-relaxed text-foreground-secondary">
+              Aucun objet pour l’instant. 3 photos suffisent pour commencer.
+            </p>
+            <Link
+              href="/scan"
+              className="flex h-11 w-fit items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-primary-on-dark"
+            >
+              <Camera size={16} />
+              Scanner mon premier objet
+            </Link>
+          </div>
         )}
       </div>
     </div>

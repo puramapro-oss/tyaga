@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 
 import LogoutButton from '@/components/layout/LogoutButton';
+import { BottomTabs, SidebarNav } from '@/components/layout/NavLinks';
 import { tyagaPalette } from '@/lib/brand/palette';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { getInitials } from '@/lib/utils';
@@ -50,14 +51,7 @@ export default async function DashboardLayout({
             <span className="font-display text-lg">TYAGA</span>
           </div>
 
-          <nav className="flex flex-col gap-1">
-            <span
-              aria-current="page"
-              className="flex h-11 items-center rounded-md bg-card px-3 text-sm font-medium text-foreground"
-            >
-              Accueil
-            </span>
-          </nav>
+          <SidebarNav />
         </div>
 
         <div className="flex flex-col gap-3">
@@ -84,14 +78,7 @@ export default async function DashboardLayout({
         <main className="flex-1 p-5 md:p-8">{children}</main>
 
         {/* Bottom tabs mobile */}
-        <nav className="fixed inset-x-0 bottom-0 z-10 flex h-[72px] items-center justify-around border-t border-border bg-background/90 backdrop-blur md:hidden">
-          <span
-            aria-current="page"
-            className="flex h-11 items-center gap-2 rounded-pill bg-card px-4 text-sm font-medium"
-          >
-            Accueil
-          </span>
-        </nav>
+        <BottomTabs />
       </div>
     </div>
   );
