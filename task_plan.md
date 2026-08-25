@@ -23,7 +23,7 @@
 
 ## P2 — Features core V1 (1/1, testée, déployée) ❌
 - [ ] P2.1 Scan 3 photos + IA vision sonnet-4-6 (/api/scan) — EX-B
-- [ ] P2.2 Estimation + net commission serveur (/api/estimate) — EX-C
+- [x] P2.2 Estimation + net commission serveur (/api/estimate) — EX-C ✅ (6/6 e2e, 10 rows SQL pct=10 net exact, append-only prouvé)
 - [ ] P2.3 Annonce assistée (/api/listing/generate) + publication marketplace C + Stripe Connect webhook partagé + export texte filet B — EX-D/E
 - [ ] P2.4 Inbox assistant + anti-fraude (1-clic jamais auto, plancher, regex hors plateforme) — EX-F
 - [ ] P2.5 Expédition guidée (checklist, adresse post-paiement, statuts manuels) — EX-G
