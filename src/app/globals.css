@@ -115,6 +115,14 @@ a {
 .link-nav {
   color: var(--foreground-muted);
 }
+
+/* Zones tactiles ≥44px (WCAG) — min-height exige inline-flex sur <a> */
+.link-action,
+.link-nav {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
 .link-nav:hover {
   text-decoration: underline;
   text-underline-offset: 3px;

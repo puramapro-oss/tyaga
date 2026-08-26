@@ -6,7 +6,7 @@ export const APP_DOMAIN = 'tyaga.purama.dev';
 
 export const SUPER_ADMIN_EMAIL = 'matiss.frasne@gmail.com';
 
-/** Seuil compteur fiscal (EX-J) : alerte à 250 ventes nettes → seuil 305 €. */
+/** Seuil compteur fiscal (EX-J) : alerte à 250 € de ventes nettes (→ seuil régime 305 €). */
 export const FISCAL_ALERT_NET_CENTS = 25000;
 
 /** Commission marketplace V1 (D13) — surchargée par TYAGA_COMMISSION_PCT. */

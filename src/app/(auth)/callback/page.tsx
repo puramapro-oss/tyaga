@@ -21,7 +21,10 @@ function CallbackInner() {
     tried.current = true;
 
     const code = searchParams.get('code');
-    const next = searchParams.get('next') || '/dashboard';
+    // Redirection interne uniquement : un `next` externe (//evil.com, https://…)
+    // serait une ouverture de redirection après connexion.
+    const rawNext = searchParams.get('next') ?? '/dashboard';
+    const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard';
     if (!code) {
       setError('Lien de connexion incomplet. Redémarre la connexion.');
       return;

@@ -239,3 +239,30 @@ Vrai fix : `lightenUntilTintedAa` cible le composite pire-cas `tintedCompositeWo
 
 - Probe v2 plein-DOM (compositing de TOUTES les couches ancêtres, méthode DA) : **min global 5,11:1** / 50 badges / 5 pages — `#e29265` « 1 filleul »/« Actif »/« En vente » 5,11 · « Estimé »/icônes 5,59 · secondary « Scanné » inchangé (déjà 5,85) · alert `#e87d87` 5,08.
 - tsc 0 · build 0 · unit 33/33 · e2e non-IA p9+p10+p11 8/8.
+
+### P6 — Lighthouse ≥95 ×4 catégories, 2 pages publiques prod (26/08/2026)
+
+Lighthouse 13.3.0 headless Chrome, cible `https://tyaga.purama.dev` (deploy `dpl_GtJ25hi54wG68Ai9FRvYYZR5tggB`, commit 39f628d). Rapports bruts `/tmp/p6-lh-home.json` + `/tmp/p6-lh-login.json`.
+
+| Page | Perf | A11y | Best-practices | SEO |
+|---|---|---|---|---|
+| `/` | **98** | **100** | **96** | **100** |
+| `/login` | **98** | **100** | **96** | **100** |
+
+EX-I5 ✅ (≥95 partout, 2 pages). Même run : `npm run lint` exit 0 (EX-J1 re-vérifié 26/08) · grep `claude` src/ = 6 hits serveur uniquement (imports/models/commentaire), 0 `.tsx`, `model_used` jamais rendu client (EX-J4 ✅).
+
+MATRICE.md créée (47 EX → test → preuve) : 41 ✅ / 4 ⏳ P6 juries / 2 🔒 IA (erreur #16).
+
+### P5 — DA boucle r4 VERT 9.36/10 (26/08/2026)
+
+4 rounds DA (r1 6.72 → r4 **9.36**, min rubrique 9.1, 7/7 ≥9). Preuves : `/tmp/da-r4/` — 15 screenshots fullPage (5 pages × 375/768/1440) + above-the-fold + `dom.json` (grilles/edges mesurés) + `contrast.json`. Fix porteurs : D11-bis contraste composite plein-DOM **min 5,11:1** / 50 badges / 5 pages (`lightenUntilTintedAa` pire-cas `bg-primary/20`+glass). Résidus D12/D13 conformes WCAG, non bloquants → V1.1 polish. **BOUCLE: VERT** (DESIGN-SCORE.md).
+
+### P6-juridique — pages légales + AI Act + favicon/OG (26/08/2026)
+
+- **F19** : 5 routes légales (`/legal`, `/legal/cgu` 13 sections, `/legal/cgv`, `/legal/mentions-legales`, `/legal/politique-confidentialite` 7 sections RGPD) via `LegalShell` — BUILD:0 (35 pages). Fix 61× `react/no-unescaped-entities` + réparation mojibake piège `perl -CSD -pi` (56 séquences double-encodées, python3 bytes — ERRORS.md + PIEGES.md).
+- **F20** : liens `/legal/*` depuis accueil public (`page.tsx:63,67`), signup (`:132,136`), aide (`:80-95`).
+- **AI Act art. 50** : disclosure triple — SupportChat (`SupportChat.tsx:60-63`), scan (`scan/page.tsx:278`), CGU §3 (ajouté 26/08).
+- **J9** : `src/app/icon.tsx` (32px) + `apple-icon.tsx` (180px) + `opengraph-image.tsx` (1200×630, `next/og` ImageResponse) + `src/lib/og-logo.tsx` (TyagaMark, couleurs littérales satori) + `layout.tsx` metadata (metadataBase, OG, twitter card).
+- **e2e p1** : fix `clearCookies` avant `/login` (piège `GOTRUE_MAILER_AUTOCONFIRM=true` : session partagée → redirect `/dashboard` → freeze exit 124). **4/4 pass** (12.4s).
+- **CONFORMITE.md** (Pilier 19) : 7 sections ✅, 3 écarts (1 FIXÉ CGU §3, 2 V1.1), verdict **VERT** `19b45b22f53f`.
+- tsc 0 · build 0 · lint 0.

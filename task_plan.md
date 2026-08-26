@@ -40,15 +40,16 @@
 - [x] /admin (super-admin gold) : users, commandes, litiges, logs — gate serveur email canonique OU `profiles.is_super_admin` (e2e via flag, jamais le compte réel), lecture seule V1, stats (utilisateurs/commandes/ventes/litiges) + tables récentes + logs Stripe, or via `--super-admin-gold` + utilities
 - [x] /aide + FAQ + chatbot SAV — 6 catégories accordéon natif (0 JS), SupportChat haiku-4-5 (auth+rate 20/h+Zod+historique 6 tours+503 FR contact humain), contact mailto visible
 
-## P5 — Design polish ❌
-- [ ] DA boucle ≥9/10 (DESIGN-SCORE.md, 3 viewports)
+## P5 — Design polish ✅
+- [x] DA boucle ≥9/10 — r4 **VERT 9.36/10** (7 rubriques ≥9.1, DESIGN-SCORE.md, 3 viewports ×5 pages ; D11-bis contraste composite 5.11:1 min ; D12/D13 résidus non bloquants → V1.1 polish)
 - [x] EX-I4 PuramaBackground fond animé (braises CSS, reduced-motion → statique)
 - [x] La Boucle signature (anneau progression Vida + braise framer-motion spring, reduced-motion → statique)
 - [x] EX-I3 safe areas iOS (viewport-fit cover + env(safe-area-inset-bottom)) — i18n 16 langues → V1.1-BACKLOG (D19)
 
-## P6 — QA + certification ❌
-- [ ] Playwright 100% SPEC (matrice traçabilité EX→preuve)
-- [ ] Lighthouse ≥95 ×4
+## P6 — QA + certification ❌ (en cours)
+- [ ] Playwright 100% SPEC (MATRICE.md 44/52 ✅ · 6 ⏳ juries · 2 🔒 IA erreur #16)
+- [x] Lighthouse ≥95 ×4 — `/` 98/100/96/100 · `/login` 98/100/96/100 (26/08)
+- [x] Correcteur queue juridique — F19 pages légales 5 routes BUILD:0 + F20 liens + IA Act (UI×2 + CGU §3) + WELCOME50 lexique + CONFORMITE.md **VERT** + J9 favicon/OG 4 fichiers
 - [ ] jury-securite 0 critical + jury-bugs + jury-tests + inspecteur-pixel/juridique
 - [ ] CERTIFIED.md (auditeur-vierge)
 
@@ -68,3 +69,5 @@
 - 2026-08-26 — P2.7 EX-J7 ✅ : compteur revenus nets annuels /dashboard (requête ventes, D14 zéro table dédiée) + bannière alerte dès 250 € nets cumulés (`>=`, progressbar → alert). Unit 28/28 (6 fiscal) · e2e p8 1/1 (7.2s, PATCH service 300 € nets déterministe, bannière+montant+barre masquée) · tsc 0 · build 0. **P2 7/7 features B→J terminé.** Prochain : P3 Universels.
 - 2026-08-26 — P3 ✅ EX-K2 + Parrainage V4 : 4 blocs above the fold /dashboard (parrainage code `TY-XXXXXX` copiable, ambassadeur, cross-promo VIDA/KASH WELCOME50, solde Vault). Boucle parrainage complète : `profiles.referral_code` (trigger+RPC `ensure_referral_code`), `/signup?ref=` → sessionStorage → `ReferralAttach` → POST `/api/referral/attach` → RPC `attach_referral` (self/already/invalid), N1 = `payReferralN1` 50% commission en points Vault branché `finalizeCompletedSale` (flag `commission_paid`, jamais bloquant). Unit 33/33 (5 referral) · e2e p9 2/2 (15.1s : blocs + rattachement filleul → compteur 1 + garde self) · tsc 0. Prochain : P4 Admin+Aide.
 - 2026-08-26 — P4 ✅ Admin+Aide : `/admin` God Mode lecture seule (gate serveur `isSuperAdmin(email) || profiles.is_super_admin`, e2e via PATCH flag — compte réel jamais créé/connecté ; stats count + 10 dernières lignes users/commandes/ventes/litiges `flagged_off_platform`/logs `stripe_events_processed` ; or `--super-admin-gold` + `.text-gold/.border-gold/.bg-gold-soft`, 0 hex dur composant). `/aide` : FAQ 6 catégories 16 entrées accordéon natif + SupportChat (`/api/ai/support` : auth 401 FR, rate 20/h/user 429 FR, Zod, haiku-4-5 max 400 tok timeout 20 s, historique 6 tours client+serveur, 503 FR → hello@tyaga.purama.dev) + carte contact humain. Nav : Aide sidebar-only + icône header mobile (bottom tabs restent 7). e2e p10 3/3 (13.0s : rendu /aide, 401 API, gate non-admin→dashboard / flag→God Mode or / flag off→dashboard) · tsc 0 · build 0 · unit 33/33. **Deploy PROD** ✅ `dpl_29dCsu45957nKHzhertqGXTMSiav` (smoke : / 200 · /login 200 · /aide 307→login · /admin 307→login). Docs : PREUVES P4 · D18 · MANAS · PIEGES ×2. Prochain : P5 Design+i18n.
+- 2026-08-26 — **P5 ✅** Design polish : DA boucle r1→r4 **VERT 9.36/10** (7 rubriques ≥9.1, 5 pages × 3 viewports, DESIGN-SCORE.md). Fix D11-bis contraste composite (probe v2 plein-DOM min 5.11:1 / 50 badges, `lightenUntilTintedAa` palette.ts). Lighthouse 13.3.0 prod ≥95 ×4 ×2 pages (EX-I5 : `/` 98/100/96/100 · `/login` 98/100/96/100). i18n 16 langues → V1.1 (D19). MATRICE.md créée 47 EX. Prochain : P6 juries.
+- 2026-08-26 — P6 correcteur queue juridique ✅ : **F19** pages légales 5 routes (`/legal` index+CGU 13 sections+CGV+mentions+polconf 7 sections RGPD, LegalShell), liens d'accès signup/aide/accueil **F20**. Fix build 61× `react/no-unescaped-entities` + piège **perl -CSD -pi double-encodage** (56 séquences réparées python3 bytes — ERRORS + PIEGES.md). **AI Act art. 50** triple disclosure : SupportChat:60-63 + scan:278 + CGU §3 (ajouté). WELCOME50 = cross-promo sœurs (0 lexique interdit, 0 faux chiffres). **J9** favicon/OG : `icon.tsx`+`apple-icon.tsx`+`opengraph-image.tsx` (next/og 1200×630)+`og-logo.tsx`+layout metadata. e2e p1 fix `clearCookies` (piège GOTRUE autoconfirm → redirect /dashboard) **4/4**. **CONFORMITE.md VERT** (Pilier 19, 7 sections, `19b45b22f53f`). tsc 0 · build 0 (35 pages). MATRICE 52 EX : 44 ✅ / 6 ⏳ / 2 🔒.

@@ -139,6 +139,22 @@ export default function Thread({ conversationId, myId }: { conversationId: strin
   }
 
   const role = data?.conversation.role;
+  // Dernière offre de l'acheteur : c'est ELLE que le vendeur « accepte »
+  // (l'API refuse tout autre montant de sa part). Le fil est ordonné du plus
+  // ancien au plus récent → on scanne depuis la fin.
+  const threadMessages = data?.messages ?? [];
+  let lastBuyerOffer: number | null = null;
+  for (let i = threadMessages.length - 1; i >= 0; i--) {
+    if (threadMessages[i].senderId !== myId && threadMessages[i].offerCents !== null) {
+      lastBuyerOffer = threadMessages[i].offerCents;
+      break;
+    }
+  }
+
+  function suggestionOffer(s: ThreadSuggestion): number | null {
+    if (role === 'seller' && s.suggestion_type === 'accept') return lastBuyerOffer;
+    return s.price_counter_cents ?? null;
+  }
 
   return (
     <div className="mx-auto flex h-full max-w-2xl flex-col">
@@ -218,7 +234,7 @@ export default function Thread({ conversationId, myId }: { conversationId: strin
               key={`${s.suggestion_type}-${i}`}
               type="button"
               disabled={sending}
-              onClick={() => void send(s.body, s.price_counter_cents ?? null)}
+              onClick={() => void send(s.body, suggestionOffer(s))}
               className="flex h-9 items-center gap-1.5 rounded-pill border border-border-control bg-background-soft px-3.5 text-sm text-foreground-secondary transition-colors hover:bg-card hover:text-foreground disabled:opacity-60"
             >
               <Sparkles size={13} className="text-secondary-on-dark" />

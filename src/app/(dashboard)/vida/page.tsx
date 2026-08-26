@@ -135,7 +135,7 @@ export default async function VidaPage() {
           aria-label="Wallet Vida"
         >
           <div className="flex items-center gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-pill bg-primary/15 text-primary">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-pill bg-primary/15 text-primary-on-dark">
               <Sparkles size={22} aria-hidden />
             </span>
             <div className="min-w-0">
@@ -252,7 +252,7 @@ export default async function VidaPage() {
                     <span
                       className={`rounded-pill px-2 py-0.5 text-xs ${
                         t.status === 'confirmed'
-                          ? 'bg-primary/15 text-primary'
+                          ? 'bg-primary/15 text-primary-on-dark'
                           : 'bg-card text-foreground-muted'
                       }`}
                     >

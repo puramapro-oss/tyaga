@@ -53,14 +53,16 @@ export default function CrossPromoCard() {
 
       <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
         <p className="text-xs leading-relaxed text-foreground-muted">
-          Code <span className="font-mono text-foreground">WELCOME50</span> à
-          l’inscription sur une app sœur.
+          Code <span className="font-mono text-foreground">WELCOME50</span> :
+          offre d’accueil à la création d’un compte sur VIDA ou KASH, valable
+          une fois par personne. Conditions détaillées sur l’app où tu
+          l’utilises.
         </p>
         <button
           type="button"
           onClick={copyCode}
           aria-label="Copier le code WELCOME50"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-pill border border-border transition-colors hover:border-primary/40"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border border-border transition-colors hover:border-primary/40"
         >
           {copied ? (
             <Check size={15} className="text-primary-on-dark" />

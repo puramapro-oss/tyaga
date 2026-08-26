@@ -127,6 +127,17 @@ function SignupForm() {
         <SubmitButton label="Créer mon compte" loading={loading} />
       </form>
       <GoogleButton onClick={handleGoogle} disabled={loading} />
+      <p className="text-center text-xs leading-relaxed text-foreground-muted">
+        En créant un compte, tu acceptes les{' '}
+        <Link href="/legal/cgu" className="link-action text-xs">
+          CGU
+        </Link>{' '}
+        et la{' '}
+        <Link href="/legal/politique-confidentialite" className="link-action text-xs">
+          politique de confidentialité
+        </Link>
+        .
+      </p>
       <p className="text-center text-sm text-foreground-secondary">
         Déjà un compte ?{' '}
         <Link href="/login" className="link-action">

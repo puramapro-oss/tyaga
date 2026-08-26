@@ -37,3 +37,15 @@ export function fiscalSummary(
 export function formatEuros(cents: number): string {
   return `${Math.round(cents / 100).toLocaleString('fr-FR')} €`;
 }
+
+/**
+ * Année fiscale au calendrier français (métropole). `Date.getFullYear()`
+ * est en UTC : une vente du 1er janvier entre 0 h et 1 h UTC serait
+ * comptée sur l'année N-1. On formate en Europe/Paris à la place.
+ */
+export function fiscalYearParis(now: Date): number {
+  return parseInt(
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(now).slice(0, 4),
+    10
+  );
+}

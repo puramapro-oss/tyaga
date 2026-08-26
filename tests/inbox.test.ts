@@ -58,6 +58,9 @@ test('EX-F4 : laisse passer un message normal', async () => {
   const { detectOffPlatform } = await loadInbox();
   assert.equal(detectOffPlatform('Bonjour ! L’objet est-il toujours disponible ?'), null);
   assert.equal(detectOffPlatform('Je te propose 40 €, ça te va ?'), null);
+  // Forme compacte 0X non séparée : assumé non détecté (trop de faux positifs
+  // sur identifiants/montants) — les formes séparées et +33/00 33 le sont.
+  assert.equal(detectOffPlatform('Commande 0612345678 à retrouver'), null);
   assert.equal(detectOffPlatform('Parfait, j’achète via le bouton Acheter !'), null);
 });
 

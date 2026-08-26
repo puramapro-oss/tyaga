@@ -1,0 +1,119 @@
+# MATRICE.md — Traçabilité EX-ID → test → preuve (TYAGA V1-CORE)
+
+> Chaque exigence SPEC.md ↔ test réel ↔ preuve mesurée. Source des preuves : PREUVES.md (détail), task_plan.md journal, /tmp probes archivés dans les rapports.
+> Statuts : ✅ prouvé · ⏳ P6 en cours · 🔒 IA différée (crédit ANTHROPIC épuisé, erreur #16 — testé vert AVANT épuisement, re-audit groupé prévu).
+
+## EX-A — Auth & compte
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| A1 inscription email+confirm+login | e2e tous specs (login tyaga-e2e + comptes seller/buyer créés + confirmés admin API) | PREUVES P2.3/P2.4 (2 comptes réels persistants) | ✅ |
+| A2 Google OAuth EN VRAI | VPS `GOTRUE_EXTERNAL_GOOGLE_ENABLED`+`URI_ALLOW_LIST`+restart AVANT test manuel | task_plan P1 `[x]` (25/08) | ✅ |
+| A3 middleware redirect + profil auto | smoke prod `/dashboard`→307 `/login?next=` ; trigger schéma `tyaga` (schema.sql) | journal 25/08 deploys smoke ; P2 comptes auto-profilés | ✅ |
+| A4 signOut non mort | e2e p9 helper `logout` (clearCookies+storages) → middleware renvoie /login | PREUVES P3 piège re-login | ✅ |
+
+## EX-B — Scan
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| B1 3 photos capture/galerie → storage `tyaga-photos/{user}/{item}` | e2e `p2-scan.spec.ts` | P2.1 ✅ 25/08 (task_plan) | ✅ |
+| B2 sha256 + captured_at | e2e p2 (colonnes SQL) | P2.1 ✅ 25/08 | ✅ |
+| B3 IA vision <20s ou message FR | e2e p2 (`/api/scan`) | P2.1 ✅ 25/08 | 🔒 re-audit à la recharge |
+| B4 IA propose, user modifie | e2e p2 (champs éditables avant save) | P2.1 ✅ 25/08 | ✅ |
+| B5 item `scanned` + liste | e2e p2 + `/objets` (« Scanné » badge, probe D11) | P2.1 ✅ 25/08 + probe 26/08 | ✅ |
+
+## EX-C — Estimation
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| C1 prix conseillé+fourchette+délai « estimé » | e2e `p2-estimate.spec.ts` | PREUVES P2.2 6/6 | ✅ |
+| C2 net serveur `prix×(1−10%)` | e2e + SQL 10 rows `pct=10` `net=round(prix×0.90)` exact | PREUVES P2.2 | ✅ |
+| C3 commission affichée AVANT publication+vente | e2e p3/p4 (assert libellé 10 %) | PREUVES P2.2/P2.3 | ✅ |
+| C4 historique append-only | e2e re-demande = nouvelle ligne, ancienne conservée | PREUVES P2.2 | ✅ |
+| C5 jamais « vendu garanti » | inspecteur-juridique scan lexical | P6 ⏳ | ⏳ |
+
+## EX-D — Annonce assistée
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| D1 IA génère titre+desc+tags, aperçu AVANT publication | e2e `p3-annonce.spec.ts` | PREUVES P2.3 (vert 25/08) | 🔒 re-audit IA |
+| D2 publication impossible sans validation explicite | e2e p3 (checkbox, bouton inactif) | PREUVES P2.3 | ✅ |
+| D3 annonce visible par tout utilisateur authentifié | e2e p3/p4 (2e compte voit `/marketplace`) | PREUVES P2.3 | ✅ |
+| D4 export texte filet B copie presse-papier | e2e p3 | PREUVES P2.3 | ✅ |
+
+## EX-E — Marketplace interne
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| E1 Stripe Connect, séquestre, acheteur≠vendeur | e2e `p4-marketplace.spec.ts` (checkout LIVE atteint, 0 carte saisie) | PREUVES P2.3 37.9s | ✅ |
+| E2 commission 10% tracée chaque vente | e2e + SQL `commission_amount_cents`/`net_amount_cents` | PREUVES P2.3 | ✅ |
+| E3 cycle états, transitions par la bonne partie (RLS) | matrice RLS 13/13 SQL VPS impersonation | PREUVES P2.3 13/13 VERT | ✅ |
+| E4 webhook partagé karma `app_slug=tyaga`, idempotence event_id | grep 0 webhook dédié + registry VPS row `tyaga` + `stripe_events_processed` | PREUVES P2.3 | ✅ |
+| E5 zéro UI paiement hors plateforme | e2e p4 assert « aucun règlement hors plateforme » + EX-F4 blocage | PREUVES P2.3 | ✅ |
+
+## EX-F — Inbox assistant
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| F1 messagerie persistée par annonce | e2e `p5-inbox.spec.ts` (2 comptes, refresh) | PREUVES P2.4 34.0s | ✅ |
+| F2 suggestions 1-clic, envoi UNIQUEMENT sur clic | unit `tests/inbox.test.ts` + e2e p5 | PREUVES P2.4 unit 12/12 | ✅ |
+| F3 plancher vendeur, jamais contre-offre dessous | unit + e2e p5 (offre 50<plancher 60 → contre=60 exact) | PREUVES P2.4 | ✅ |
+| F4 regex hors plateforme → bloqué + flag | unit (IBAN/RIB/PayPal/WA/TG/Revolut/Lydia/tél/email) + e2e p5 SQL `flagged_off_platform=true` | PREUVES P2.4 | ✅ |
+
+## EX-G — Expédition
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| G1 checklist emballage 4+ étapes | e2e `p6-expedition.spec.ts` (6 étapes, 0/6→1/6) | PREUVES P2.5 29.8s | ✅ |
+| G2 adresse livraison visible seulement post-paiement | e2e p4 (ABSENT pending) + p6 (visible paid) | PREUVES P2.3/P2.5 | ✅ |
+| G3 suivi manuel → séquestre libéré + vente finalisée | e2e p6 SQL `status=completed, escrow_status=released` | PREUVES P2.5 | ✅ |
+
+## EX-H — Vida Vault
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| H1 wallet points auto (1pt=1€ net) | e2e `p7-vida.spec.ts` SQL delta wallet | PREUVES P2.6 39.0s | ✅ |
+| H2 propositions 0/30/50/100% jamais auto | e2e p7 (radio, statut `proposed`) | PREUVES P2.6 | ✅ |
+| H3 confirmation explicite 2-step RPC | e2e p7 clic + SQL atomique ; fix SECURITY DEFINER | PREUVES P2.6 | ✅ |
+| H4 progression + objectifs CRUD | e2e p7 (objectif 100pts, barre, création) | PREUVES P2.6 | ✅ |
+| H5 sandbox, 0 virement réel | grep code vida 0 appel payout + bannière e2e | PREUVES P2.6 | ✅ |
+
+## EX-I — Design
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| I1 palette seed générée `/lib/brand/`, 0 hex dur composants | grep hex composants ; DA r1-r4 | PREUVES P4 (admin gold utilities) + DA | ✅ |
+| I2 typo Bricolage+Geist | layout.tsx fonts | DA r1-r4 | ✅ |
+| I3 responsive 375→1920, sidebar+bottom tabs, safe areas | probes overflow 0px @375/@768 (r2 D8, r3) + e2e p11 viewport-fit | PREUVES P5 r2/r3 | ✅ |
+| I4 PuramaBackground animé, pas fond statique | e2e p11 (9 braises, keyframes, z<0, reduced-motion) | PREUVES P5 | ✅ |
+| I5 Lighthouse ≥95 ×4 | Lighthouse 13.3.0 prod 26/08 : `/` perf 98 · a11y 100 · bp 96 · seo 100 ; `/login` 98/100/96/100 (/tmp/p6-lh-*.json) | ✅ ≥95 ×4 ×2 pages |
+| I6 anti-slop variante revente consumer | DA boucle ≥9/10 (r4 en cours) | DESIGN-SCORE.md | ⏳ r4 |
+
+## EX-J — Transverse
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| J1 tsc 0 + lint 0 + build 0 | chaque feature | PREUVES toutes sections (26/08 dernier run) | ✅ |
+| J2 erreurs FR + solution | e2e p10 (401 « Connecte-toi ») + SupportChat 503 FR | PREUVES P4 | ✅ |
+| J3 loading+error+empty chaque vue | inspecteur-utilisateur jury (P6) | P6 ⏳ | ⏳ |
+| J4 IA s'appelle TYAGA | grep -ri 'claude' src/ → 6 hits serveur seulement (imports/models/commentaire), 0 .tsx, `model_used` jamais rendu | ✅ 26/08 |
+| J5 RLS 100% tables | matrice RLS 13/13 orders + jury-securite toutes tables (P6) | PREUVES P2.3 partiel | ⏳ P6 |
+| J6 rate limit + Zod + try/catch toutes API | jury-securite (P6) ; SupportChat rate 20/h/user → 429 FR (PREUVES P4 aide) | P6 ⏳ partiel | ⏳ |
+| J7 fiscal compteur + alerte 250€ | unit 6 + e2e `p8-fiscal.spec.ts` bannière frontière | PREUVES P2.7 | ✅ |
+| J8 0 placeholder/TODO/console.log/any, 0 faux chiffres | jury-bugs + inspecteur-juridique (P6) | P6 ⏳ | ⏳ |
+| J9 favicon + OG image custom TYAGA | `src/app/icon.tsx` (32) + `apple-icon.tsx` (180) + `opengraph-image.tsx` (1200×630, next/og) + `src/lib/og-logo.tsx` + layout metadata OG/twitter | BUILD:0 35 pages (26/08) | ✅ |
+
+## EX-K — Accueil & navigation
+
+| EX | Test | Preuve | Statut |
+|---|---|---|---|
+| K1 `/` écran app (logo + Commencer + Se connecter), 0 landing 13 sections | e2e `p1-auth.spec.ts` (goto `/` → CTA visibles) + DA r1-r4 | PREUVES P2.3 ; DESIGN-SCORE | ✅ |
+| K2 dashboard 3 blocs above the fold (parrainage, ambassadeur, cross-promo WELCOME50) + objets + Vault | e2e `p9-universels.spec.ts` (4 headings + WELCOME50 + liens vida/kash.purama.dev) | PREUVES P3 (26/08) | ✅ |
+
+## Bilan
+
+- ✅ prouvé : 44/52
+- ⏳ P6 (en cours) : 6 — C5, I6 (DA r4 → VERT 9.36, reste boucle formelle), J3, J5 (extension toutes tables), J6, J8 → portes par les juries P6
+- 🔒 IA différée : 2 — B3, D1 (testés verts 25/08 avant épuisement crédit ; re-audit groupé à la recharge, erreur #16 CLAUDE.md)
+
+Dernière mise à jour : 2026-08-26 (queue P6 correcteur : J9+K1/K2 ajoutés, J6 citation corrigée, pages légales BUILD:0, CONFORMITE.md VERT).

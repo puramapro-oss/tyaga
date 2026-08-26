@@ -39,7 +39,7 @@ export default async function DashboardPage() {
       .from('items')
       .select('id')
       .eq('user_id', user!.id)
-      .neq('status', 'draft'),
+      .eq('status', 'listed'),
     supabase
       .from('ventes')
       .select('net_amount_cents, fiscal_year')

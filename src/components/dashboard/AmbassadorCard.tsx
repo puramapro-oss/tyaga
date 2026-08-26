@@ -34,7 +34,8 @@ export default function AmbassadorCard({ filleuls }: { filleuls: number }) {
 
       <p className="flex items-start gap-2 border-t border-border pt-3 text-xs leading-relaxed text-foreground-muted">
         <Sparkles size={13} className="mt-0.5 shrink-0" aria-hidden />
-        Statut d’Ambassadeur conservé à vie, sans palier ni engagement.
+        Statut d’Ambassadeur conservé sans palier ni engagement, tant que le
+        programme de parrainage TYAGA reste actif.
       </p>
     </section>
   );

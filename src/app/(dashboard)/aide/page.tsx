@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { LifeBuoy, Mail } from 'lucide-react';
 
 import SupportChat from '@/components/aide/SupportChat';
@@ -74,6 +75,27 @@ export default function AidePage() {
           </p>
         </div>
       </section>
+
+      <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 pb-2 text-xs text-foreground-muted">
+        <Link href="/legal/cgu" className="link-action text-xs">
+          CGU
+        </Link>
+        ·
+        <Link href="/legal/cgv" className="link-action text-xs">
+          CGV
+        </Link>
+        ·
+        <Link
+          href="/legal/politique-confidentialite"
+          className="link-action text-xs"
+        >
+          Confidentialité
+        </Link>
+        ·
+        <Link href="/legal/mentions-legales" className="link-action text-xs">
+          Mentions légales
+        </Link>
+      </p>
     </div>
   );
 }

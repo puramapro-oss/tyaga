@@ -68,7 +68,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
     entries: [
       {
         q: 'Pourquoi mon message a-t-il été bloqué ?',
-        a: "TYAGA bloque les messages qui tentent de contourner la plateforme : IBAN, RIB, PayPal, WhatsApp, Telegram, numéro de téléphone, e-mail… C'est une protection : payer hors plateforme fait perdre la protection acheteur ET la garantie de paiement vendeur.",
+        a: "TYAGA bloque les messages qui tentent de contourner la plateforme : IBAN, RIB, PayPal, WhatsApp, Telegram, numéro de téléphone, e-mail… C'est une protection : payer hors plateforme fait perdre la protection acheteur ET la sécurisation du paiement vendeur.",
       },
       {
         q: 'Je me dispute avec l’autre partie, qui tranche ?',

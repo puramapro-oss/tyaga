@@ -69,8 +69,8 @@ export default function FiscalCounter({ summary }: { summary: FiscalSummary }) {
               {formatEuros(summary.thresholdCents)} de revenus nets atteints
               cette année.
             </span>{' '}
-            En tant qu’auto-entrepreneur, ces ventes sont à déclarer — TYAGA
-            t’envoie un récapitulatif par vente pour t’y aider.
+            Ces revenus sont à déclarer selon ton régime fiscal — cette
+            information est indicative et ne constitue pas un conseil fiscal.
           </span>
         </p>
       )}

@@ -122,7 +122,9 @@ CREATE INDEX IF NOT EXISTS idx_annonces_status ON tyaga.annonces(status);
 -- Option C : paiement Stripe Connect, fonds séquestrés jusqu'à livraison
 CREATE TABLE IF NOT EXISTS tyaga.marketplace_orders (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  annonce_id uuid NOT NULL REFERENCES tyaga.annonces(id) ON DELETE CASCADE,
+  -- RESTRICT (jury F5) : supprimer une annonce ne doit JAMAIS détruire une
+  -- commande — le vendeur résout d'abord la commande.
+  annonce_id uuid NOT NULL REFERENCES tyaga.annonces(id) ON DELETE RESTRICT,
   item_id uuid NOT NULL REFERENCES tyaga.items(id) ON DELETE CASCADE,
   buyer_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
   seller_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
@@ -145,6 +147,12 @@ CREATE TABLE IF NOT EXISTS tyaga.marketplace_orders (
 CREATE INDEX IF NOT EXISTS idx_orders_buyer ON tyaga.marketplace_orders(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_seller ON tyaga.marketplace_orders(seller_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON tyaga.marketplace_orders(status);
+-- Un seul acheteur actif par annonce (jury F3) : le count-then-insert de
+-- l'API reste, mais la contrainte DB ferme la fenêtre TOCTOU (2 acheteurs
+-- ~200 ms apart) — l'API traduit 23505 en 409.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_annonce_active
+  ON tyaga.marketplace_orders(annonce_id)
+  WHERE status IN ('pending','paid','shipped','delivered','completed');
 -- Idempotence webhook (EX-E4)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_payment_intent ON tyaga.marketplace_orders(stripe_payment_intent_id) WHERE stripe_payment_intent_id IS NOT NULL;
 
@@ -180,6 +188,7 @@ CREATE TABLE IF NOT EXISTS tyaga.inbox_messages (
   body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
   flagged_off_platform boolean NOT NULL DEFAULT false,  -- EX-F4
   flag_reason text,
+  offer_cents integer,                       -- offre acheteur / acceptation vendeur (prix négocié)
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -211,9 +220,9 @@ CREATE TABLE IF NOT EXISTS tyaga.vida_transfers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
   vente_id uuid REFERENCES tyaga.ventes(id) ON DELETE SET NULL,
-  objectif_id uuid,
+  objectif_id uuid REFERENCES tyaga.vida_objectifs(id) ON DELETE SET NULL,  -- jury F4 : intégrité
   pct integer NOT NULL CHECK (pct IN (0,30,50,100)),   -- EX-H2
-  points_amount integer NOT NULL,
+  points_amount integer NOT NULL CHECK (points_amount >= 0),
   status text NOT NULL DEFAULT 'proposed'
     CHECK (status IN ('proposed','confirmed','cancelled')),  -- EX-H3 confirmation user
   confirmed_at timestamptz,
@@ -328,23 +337,36 @@ DROP POLICY IF EXISTS orders_select ON tyaga.marketplace_orders;
 CREATE POLICY orders_select ON tyaga.marketplace_orders FOR SELECT
   USING (buyer_id = auth.uid() OR seller_id = auth.uid());
 DROP POLICY IF EXISTS orders_insert ON tyaga.marketplace_orders;
+-- Jury F5 : la ligne insérée doit référencer une annonce publiée du vendeur
+-- désigné — impossible de forger un ordre sur une annonce draft/unpublished
+-- ou d'usurper seller_id.
 CREATE POLICY orders_insert ON tyaga.marketplace_orders FOR INSERT
-  WITH CHECK (buyer_id = auth.uid() AND status = 'pending');
+  WITH CHECK (
+    buyer_id = auth.uid()
+    AND status = 'pending'
+    AND escrow_status = 'none'
+    AND seller_id = (
+      SELECT a.user_id FROM tyaga.annonces a
+      WHERE a.id = annonce_id AND a.status = 'published')
+  );
 -- EX-E3 — transitions par partie uniquement (USING = état AVANT, WITH CHECK = état APRÈS) :
 --   buyer  : pending→cancelled, shipped→delivered
---   seller : paid→shipped
+--   seller : pending→cancelled (jury F2 : débloquer une annonce abandonnée), paid→shipped
 --   system (service role, bypass RLS) : pending→paid, delivered→completed, remboursements
+--   MIROIR de src/lib/order-transitions.ts — toute modification se fait des deux côtés.
 DROP POLICY IF EXISTS orders_update ON tyaga.marketplace_orders;
 CREATE POLICY orders_update ON tyaga.marketplace_orders FOR UPDATE
   USING (
        (buyer_id = auth.uid()  AND status = 'pending')
     OR (buyer_id = auth.uid()  AND status = 'shipped')
     OR (seller_id = auth.uid() AND status = 'paid')
+    OR (seller_id = auth.uid() AND status = 'pending')
   )
   WITH CHECK (
        (buyer_id = auth.uid()  AND status = 'cancelled')
     OR (buyer_id = auth.uid()  AND status = 'delivered')
     OR (seller_id = auth.uid() AND status = 'shipped')
+    OR (seller_id = auth.uid() AND status = 'cancelled')
   );
 
 -- VENTES : seller (lecteur), écritures serveur uniquement (service role bypass RLS)
@@ -356,11 +378,20 @@ DROP POLICY IF EXISTS convs_select ON tyaga.conversations;
 CREATE POLICY convs_select ON tyaga.conversations FOR SELECT
   USING (buyer_id = auth.uid() OR seller_id = auth.uid());
 DROP POLICY IF EXISTS convs_insert ON tyaga.conversations;
-CREATE POLICY convs_insert ON tyaga.conversations FOR INSERT WITH CHECK (buyer_id = auth.uid());
+-- Jury F14 : seul l'ACHETEUR ouvre une conversation, et uniquement sur une
+-- annonce publiée appartenant au vendeur désigné.
+CREATE POLICY convs_insert ON tyaga.conversations FOR INSERT WITH CHECK (
+  buyer_id = auth.uid()
+  AND seller_id = (SELECT a.user_id FROM tyaga.annonces a
+                   WHERE a.id = annonce_id AND a.status = 'published')
+);
 DROP POLICY IF EXISTS msgs_select ON tyaga.inbox_messages;
+-- EX-F4 + jury F4 : un message bloqué (hors plateforme) n'est visible QUE de
+-- son envoyeur — jamais délivré au destinataire.
 CREATE POLICY msgs_select ON tyaga.inbox_messages FOR SELECT
   USING (EXISTS (SELECT 1 FROM tyaga.conversations c
-                 WHERE c.id = conversation_id AND (c.buyer_id = auth.uid() OR c.seller_id = auth.uid())));
+                 WHERE c.id = conversation_id AND (c.buyer_id = auth.uid() OR c.seller_id = auth.uid()))
+         AND (NOT flagged_off_platform OR sender_id = auth.uid()));
 DROP POLICY IF EXISTS msgs_insert ON tyaga.inbox_messages;
 CREATE POLICY msgs_insert ON tyaga.inbox_messages FOR INSERT
   WITH CHECK (sender_id = auth.uid()
@@ -383,7 +414,19 @@ CREATE POLICY wallet_select ON tyaga.vida_wallet FOR SELECT USING (user_id = aut
 DROP POLICY IF EXISTS transfers_select ON tyaga.vida_transfers;
 CREATE POLICY transfers_select ON tyaga.vida_transfers FOR SELECT USING (user_id = auth.uid());
 DROP POLICY IF EXISTS transfers_insert ON tyaga.vida_transfers;
-CREATE POLICY transfers_insert ON tyaga.vida_transfers FOR INSERT WITH CHECK (user_id = auth.uid());
+-- Jury F2 : pas d'insert direct forgé — points >= 0, vente appartenant au
+-- vendeur avec un net suffisant, objectif au vendeur. Le serveur recalcule
+-- toujours le montant (transfers/route.ts), la policy ferme le reste.
+CREATE POLICY transfers_insert ON tyaga.vida_transfers FOR INSERT WITH CHECK (
+  user_id = auth.uid()
+  AND status = 'proposed'
+  AND points_amount >= 0
+  AND (vente_id IS NULL OR EXISTS (
+    SELECT 1 FROM tyaga.ventes v
+    WHERE v.id = vente_id AND v.seller_id = auth.uid() AND v.net_amount_cents >= points_amount))
+  AND (objectif_id IS NULL OR EXISTS (
+    SELECT 1 FROM tyaga.vida_objectifs o WHERE o.id = objectif_id AND o.user_id = auth.uid()))
+);
 DROP POLICY IF EXISTS transfers_update ON tyaga.vida_transfers;
 CREATE POLICY transfers_update ON tyaga.vida_transfers FOR UPDATE USING (user_id = auth.uid());
 DROP POLICY IF EXISTS objectifs_select ON tyaga.vida_objectifs;
@@ -398,8 +441,10 @@ CREATE POLICY objectifs_delete ON tyaga.vida_objectifs FOR DELETE USING (user_id
 -- REFERRALS : referrer
 DROP POLICY IF EXISTS referrals_select ON tyaga.referrals;
 CREATE POLICY referrals_select ON tyaga.referrals FOR SELECT USING (referrer_id = auth.uid());
-DROP POLICY IF EXISTS referrals_insert ON tyaga.referrals;
-CREATE POLICY referrals_insert ON tyaga.referrals FOR INSERT WITH CHECK (referrer_id = auth.uid());
+-- Jury F3 : AUCUNE policy referrals_insert — l'insert direct permettait de
+-- se déclarer parrain de n'importe qui. Tout attach passe par la RPC
+-- attach_referral (SECURITY DEFINER, gardes anti-abus intégrées).
+-- (referrals_select reste : le parrain lit ses filleuls.)
 
 -- ============ STORAGE ============
 -- Bucket tyaga-photos : upload owner {user_id}/..., lecture annonces publiées
@@ -412,8 +457,11 @@ CREATE POLICY tyaga_photos_insert ON storage.objects FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'tyaga-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
 
 DROP POLICY IF EXISTS tyaga_photos_select ON storage.objects;
+-- Jury F7 : lecture directe réservée au propriétaire du dossier. Les acheteurs
+-- reçoivent des URL signées créées côté serveur (createSignedUrl passe outre
+-- RLS) — aucun impact sur l'affichage des annonces.
 CREATE POLICY tyaga_photos_select ON storage.objects FOR SELECT TO authenticated
-  USING (bucket_id = 'tyaga-photos');
+  USING (bucket_id = 'tyaga-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
 
 DROP POLICY IF EXISTS tyaga_photos_delete ON storage.objects;
 CREATE POLICY tyaga_photos_delete ON storage.objects FOR DELETE TO authenticated
@@ -483,6 +531,7 @@ DECLARE
   v_user uuid := auth.uid();
   v_tr tyaga.vida_transfers;
   v_pts integer;
+  v_objectif_ok boolean;
 BEGIN
   IF v_user IS NULL THEN RETURN 0; END IF;
   SELECT * INTO v_tr FROM tyaga.vida_transfers
@@ -496,6 +545,14 @@ BEGIN
     UPDATE tyaga.vida_transfers SET status = 'confirmed', confirmed_at = now() WHERE id = p_transfer;
     RETURN 1;
   END IF;
+
+  -- Jury F4 : l'objectif est vérifié AVANT tout débit. L'ancien ordre
+  -- (débit → check) détruisait les points si l'objectif était inactif :
+  -- chaque retry consumait v_pts une seconde fois.
+  SELECT EXISTS (SELECT 1 FROM tyaga.vida_objectifs
+                  WHERE id = v_tr.objectif_id AND user_id = v_user AND active)
+    INTO v_objectif_ok;
+  IF NOT v_objectif_ok THEN RETURN -2; END IF;
 
   UPDATE tyaga.vida_wallet
      SET balance_points = balance_points - v_pts, updated_at = now()
@@ -511,7 +568,34 @@ BEGIN
   RETURN 1;
 END $$;
 
+REVOKE EXECUTE ON FUNCTION tyaga.confirm_transfer(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION tyaga.confirm_transfer(uuid) TO authenticated;
+
+-- Jury F8 : remboursement d'une vente COMPLÉTÉE → clawback atomique.
+-- Supprime la vente, redébite le wallet (plancher 0 — le solde peut avoir
+-- bougé depuis), côté serveur uniquement. total_earned_points reste vrai
+-- (cumul historique gagné, la vague remboursée s'annule au solde).
+CREATE OR REPLACE FUNCTION tyaga.reverse_sale(p_order uuid)
+RETURNS integer LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = tyaga, public AS $$
+DECLARE
+  v_net integer;
+  v_seller uuid;
+BEGIN
+  SELECT v.net_amount_cents, o.seller_id INTO v_net, v_seller
+    FROM tyaga.ventes v JOIN tyaga.marketplace_orders o ON o.id = v.order_id
+   WHERE v.order_id = p_order;
+  IF v_seller IS NULL THEN RETURN 0; END IF;
+
+  DELETE FROM tyaga.ventes WHERE order_id = p_order;
+
+  UPDATE tyaga.vida_wallet
+     SET balance_points = GREATEST(balance_points - v_net, 0), updated_at = now()
+   WHERE user_id = v_seller;
+  RETURN 1;
+END $$;
+
+REVOKE ALL ON FUNCTION tyaga.reverse_sale(uuid) FROM PUBLIC, anon, authenticated;
 
 -- ============ P3 UNIVERSNELS — Parrainage V4 (idempotent, cf sql/p3-universels.sql) ============
 ALTER TABLE tyaga.profiles ADD COLUMN IF NOT EXISTS referral_code text;

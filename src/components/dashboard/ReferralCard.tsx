@@ -57,7 +57,7 @@ export default function ReferralCard({
             type="button"
             onClick={() => copy('code')}
             aria-label="Copier mon code de parrainage"
-            className="flex h-9 w-9 items-center justify-center rounded-pill border border-border transition-colors hover:border-primary/40"
+            className="flex h-11 w-11 items-center justify-center rounded-pill border border-border transition-colors hover:border-primary/40"
           >
             {copied === 'code' ? (
               <Check size={15} className="text-primary-on-dark" />

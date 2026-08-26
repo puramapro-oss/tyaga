@@ -86,7 +86,11 @@ export default async function DashboardLayout({
           </div>
         </header>
 
-        <main className="flex-1 p-5 md:p-8">{children}</main>
+        {/* pb mobile ≥ hauteur bottom tabs (72px + safe-area) — utility ici
+            car p-5 (classe) écraserait la règle `main` de globals.css. */}
+        <main className="flex-1 p-5 pb-[calc(72px+env(safe-area-inset-bottom))] md:p-8 md:pb-8">
+          {children}
+        </main>
 
         {/* Bottom tabs mobile */}
         <BottomTabs />

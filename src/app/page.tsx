@@ -58,6 +58,24 @@ export default function HomePage() {
         <p className="text-xs text-foreground-secondary">
           Par PURAMA · Écosystème Vida
         </p>
+
+        <p className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xs text-foreground-muted">
+          <Link href="/legal/cgu" className="link-action text-xs">
+            CGU
+          </Link>
+          ·
+          <Link href="/legal/cgv" className="link-action text-xs">
+            CGV
+          </Link>
+          ·
+          <Link href="/legal/politique-confidentialite" className="link-action text-xs">
+            Confidentialité
+          </Link>
+          ·
+          <Link href="/legal/mentions-legales" className="link-action text-xs">
+            Mentions légales
+          </Link>
+        </p>
       </div>
     </main>
   );

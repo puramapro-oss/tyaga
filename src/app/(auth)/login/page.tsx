@@ -17,7 +17,9 @@ import { createClient } from '@/lib/supabase';
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '/dashboard';
+  // Redirection interne uniquement (anti open redirect après connexion)
+  const rawNext = searchParams.get('next') ?? '/dashboard';
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

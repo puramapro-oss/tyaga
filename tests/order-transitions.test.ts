@@ -28,11 +28,12 @@ test('buyer : pending→cancelled et shipped→delivered uniquement', () => {
   assert.ok(!canTransition('buyer', 'completed', 'cancelled'));
 });
 
-test('seller : paid→shipped uniquement', () => {
+test('seller : paid→shipped et pending→cancelled (retrait de vente)', () => {
   assert.ok(canTransition('seller', 'paid', 'shipped'));
-  assert.ok(!canTransition('seller', 'pending', 'cancelled')); // annulation = acheteur
+  assert.ok(canTransition('seller', 'pending', 'cancelled')); // retrait avant paiement
   assert.ok(!canTransition('seller', 'shipped', 'delivered')); // réception = acheteur
   assert.ok(!canTransition('seller', 'paid', 'completed'));
+  assert.ok(!canTransition('seller', 'paid', 'cancelled')); // payé : remboursement = système
 });
 
 test('system : paiement, clôture, remboursement', () => {
@@ -44,8 +45,9 @@ test('system : paiement, clôture, remboursement', () => {
   assert.ok(!canTransition('system', 'pending', 'shipped')); // pas de saut d'état
 });
 
-test('USER_ACTIONS mappent les 3 actions utilisateur', () => {
+test('USER_ACTIONS mappent les 4 actions utilisateur', () => {
   assert.deepEqual(USER_ACTIONS.cancel, { actor: 'buyer', to: 'cancelled' });
+  assert.deepEqual(USER_ACTIONS.seller_cancel, { actor: 'seller', to: 'cancelled' });
   assert.deepEqual(USER_ACTIONS.ship, { actor: 'seller', to: 'shipped' });
   assert.deepEqual(USER_ACTIONS.deliver, { actor: 'buyer', to: 'delivered' });
 });

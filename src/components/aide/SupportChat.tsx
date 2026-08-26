@@ -58,8 +58,8 @@ export default function SupportChat() {
     <section className="glass p-5 md:p-6" aria-label="Assistant support TYAGA">
       <h2 className="font-display text-xl">Poser une question</h2>
       <p className="mt-1 text-sm text-foreground-muted">
-        Réponse immédiate sur le fonctionnement de TYAGA ; on transmet au
-        support humain pour tout le reste.
+        Réponse immédiate par IA sur le fonctionnement de TYAGA ; on transmet
+        au support humain pour tout le reste.
       </p>
 
       {turns.length === 0 && !pending && (
@@ -69,7 +69,7 @@ export default function SupportChat() {
               key={q}
               type="button"
               onClick={() => send(q)}
-              className="rounded-pill bg-card px-3.5 py-2 text-xs font-medium text-foreground-muted transition-colors hover:bg-primary/15 hover:text-foreground"
+              className="min-h-11 rounded-pill bg-card px-3.5 py-2 text-xs font-medium text-foreground-muted transition-colors hover:bg-primary/15 hover:text-foreground"
             >
               {q}
             </button>

@@ -94,10 +94,42 @@ export async function POST(request: Request) {
     );
   }
 
+  // Prix négocié (EX-D) : si la conversation avec le vendeur porte une offre
+  // de l'acheteur que le vendeur a ACCEPTÉE (même montant), c'est ce prix qui
+  // fait foi — sinon on reste au prix de l'annonce.
+  let priceCents = annonce.price_cents;
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('annonce_id', annonce.id)
+    .eq('buyer_id', user.id)
+    .maybeSingle();
+  if (conv) {
+    const { data: msgs } = await supabase
+      .from('inbox_messages')
+      .select('sender_id, offer_cents')
+      .eq('conversation_id', conv.id)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    const latest = [...(msgs ?? [])].reverse();
+    const buyerOffer = latest.find((m) => m.sender_id === user.id && m.offer_cents !== null)
+      ?.offer_cents;
+    const sellerAccept = latest.find(
+      (m) => m.sender_id === annonce.user_id && m.offer_cents !== null
+    )?.offer_cents;
+    if (
+      buyerOffer != null &&
+      sellerAccept != null &&
+      buyerOffer === sellerAccept &&
+      buyerOffer >= 100 &&
+      buyerOffer <= annonce.price_cents
+    ) {
+      priceCents = buyerOffer;
+    }
+  }
+
   // EX-E2 : commission calculée SERVEUR à la création, tracée en colonnes
-  const { grossCents, commissionPct, commissionCents, netCents } = computeCommission(
-    annonce.price_cents
-  );
+  const { grossCents, commissionPct, commissionCents, netCents } = computeCommission(priceCents);
 
   // RLS orders_insert : buyer + status pending ✓
   const { data: order, error: orderError } = await supabase
@@ -118,7 +150,15 @@ export async function POST(request: Request) {
     .select('id')
     .single();
 
-  if (orderError || !order) {
+  if (orderError?.code === '23505' || !order) {
+    // idx_orders_annonce_active : un autre acheteur est passé entre le count
+    // et l'insert (fenêtre TOCTOU fermée par l'index unique partiel).
+    return NextResponse.json(
+      { error: 'Cet objet a déjà un acheteur en cours.' },
+      { status: 409 }
+    );
+  }
+  if (orderError) {
     return NextResponse.json(
       { error: 'Commande impossible. Réessaie dans un instant.' },
       { status: 500 }

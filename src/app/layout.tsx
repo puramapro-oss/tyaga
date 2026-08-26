@@ -26,6 +26,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://tyaga.purama.dev'),
   title: {
     default: 'TYAGA — Vends ce qui t’encombre',
     template: '%s · TYAGA',
@@ -33,6 +34,20 @@ export const metadata: Metadata = {
   description:
     'Prends une photo. TYAGA rédige l’annonce, gère la vente et la mise en scène. Vida encaisse pour tes objectifs.',
   applicationName: APP_NAME,
+  openGraph: {
+    type: 'website',
+    siteName: 'TYAGA',
+    locale: 'fr_FR',
+    title: 'TYAGA — Vends ce qui t’encombre',
+    description:
+      'Prends une photo. TYAGA rédige l’annonce, gère la vente et la mise en scène. Vida encaisse pour tes objectifs.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'TYAGA — Vends ce qui t’encombre',
+    description:
+      'Prends une photo. TYAGA rédige l’annonce, gère la vente et la mise en scène. Vida encaisse pour tes objectifs.',
+  },
 };
 
 export const viewport: Viewport = {

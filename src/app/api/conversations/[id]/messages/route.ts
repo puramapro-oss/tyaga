@@ -64,10 +64,33 @@ export async function POST(
     );
   }
 
-  // Seul l'acheteur joint une offre chiffrée (la négo vendeur passe par les
-  // suggestions, toujours ≥ plancher — EX-F3)
-  const offerCents =
-    conv.buyer_id === user.id ? (parsed.data.offerCents ?? null) : null;
+  // Offre chiffrée : l'acheteur propose (EX-D) ; le vendeur ne peut en poser
+  // une QUE pour ACCEPTER la dernière offre acheteur en cours, au montant
+  // exact — la contre-offre vendeur passe par les suggestions (≥ plancher, EX-F3).
+  let offerCents: number | null = null;
+  if (conv.buyer_id === user.id) {
+    offerCents = parsed.data.offerCents ?? null;
+  } else if (parsed.data.offerCents != null) {
+    const { data: lastBuyerOffer } = await supabase
+      .from('inbox_messages')
+      .select('offer_cents')
+      .eq('conversation_id', conv.id)
+      .eq('sender_id', conv.buyer_id)
+      .not('offer_cents', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (
+      !lastBuyerOffer?.offer_cents ||
+      lastBuyerOffer.offer_cents !== parsed.data.offerCents
+    ) {
+      return NextResponse.json(
+        { error: 'Tu ne peux accepter que la dernière offre de l’acheteur, au montant exact.' },
+        { status: 400 }
+      );
+    }
+    offerCents = parsed.data.offerCents;
+  }
 
   // EX-F4 : détection hors plateforme AVANT délivrance
   const offPlatform = detectOffPlatform(parsed.data.body);

@@ -6,7 +6,9 @@
  *   buyer  : pending → cancelled   (avant paiement)
  *            shipped → delivered   (confirmation réception)
  *   seller : paid → shipped        (expédition)
+ *            pending → cancelled   (retirer l'objet avant paiement)
  *   system : pending → paid        (checkout.session.completed)
+ *            pending → cancelled   (checkout.session.expired)
  *            delivered → completed (après 'delivered' acheteur, + séquestre libéré + vente)
  *            * → refunded/cancelled (charge.refunded)
  */
@@ -28,9 +30,10 @@ const TRANSITIONS: Record<OrderActor, Partial<Record<OrderStatus, OrderStatus[]>
   },
   seller: {
     paid: ['shipped'],
+    pending: ['cancelled'],
   },
   system: {
-    pending: ['paid'],
+    pending: ['paid', 'cancelled'], // cancelled = checkout.session.expired
     delivered: ['completed'],
     paid: ['cancelled'],
     shipped: ['cancelled'],
@@ -67,6 +70,7 @@ export class TransitionError extends Error {
 /** Action utilisateur → acteur + statut cible (API transition). */
 export const USER_ACTIONS = {
   cancel: { actor: 'buyer' as const, to: 'cancelled' as const },
+  seller_cancel: { actor: 'seller' as const, to: 'cancelled' as const },
   ship: { actor: 'seller' as const, to: 'shipped' as const },
   deliver: { actor: 'buyer' as const, to: 'delivered' as const },
 } as const;

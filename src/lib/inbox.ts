@@ -35,7 +35,7 @@ const OFF_PLATFORM_PATTERNS: readonly { label: string; fr: string; re: RegExp }[
   {
     label: 'téléphone',
     fr: 'numéro de téléphone',
-    re: /(?:\+|00)\s?33\s?[1-9](?:[\s.-]?\d{2}){4}|\b0[1-9](?:[\s.-]?\d{2}){4}\b/,
+    re: /(?:\+|00)\s?33\s?[1-9](?:[\s.-]?\d{2}){4}|\b0[1-9](?=[\s.-])(?:[\s.-]?\d{2}){4}\b/,
   },
 ];
 

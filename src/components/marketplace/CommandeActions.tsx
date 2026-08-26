@@ -31,11 +31,13 @@ export default function CommandeActions({
   const action =
     role === 'buyer' && status === 'pending'
       ? { key: 'cancel', label: 'Annuler la commande' }
-      : role === 'seller' && status === 'paid'
-        ? { key: 'ship', label: 'Objet expédié' }
-        : role === 'buyer' && status === 'shipped'
-          ? { key: 'deliver', label: 'J’ai bien reçu l’objet' }
-          : null;
+      : role === 'seller' && status === 'pending'
+        ? { key: 'seller_cancel', label: 'Retirer l’objet de la vente' }
+        : role === 'seller' && status === 'paid'
+          ? { key: 'ship', label: 'Objet expédié' }
+          : role === 'buyer' && status === 'shipped'
+            ? { key: 'deliver', label: 'J’ai bien reçu l’objet' }
+            : null;
 
   if (!action) return null;
 
