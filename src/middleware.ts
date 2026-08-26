@@ -19,7 +19,12 @@ function isPublic(pathname: string): boolean {
     pathname.startsWith('/legal/') ||
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico' ||
-    pathname === '/robots.txt'
+    pathname === '/robots.txt' ||
+    // Routes metadata générées (icon.tsx / apple-icon.tsx / opengraph-image.tsx)
+    // — publiques : favicon + aperçu OG visités sans session.
+    pathname === '/icon' ||
+    pathname === '/apple-icon' ||
+    pathname === '/opengraph-image'
   );
 }
 
