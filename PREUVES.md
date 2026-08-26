@@ -217,3 +217,16 @@ Verdict DA r2 : **6.57/10 — BOUCLE: CONTINUER** (R6 overflow 5.0, R1 login 5.0
 - Contraste mesuré navigateur : tous les CTA primary pleins = **6.58:1** fg `rgb(26,13,5)` (« Commencer », « Copier mon lien d'invitation », « Proposer 24 pts », « Créer l'objectif », envoi chat SAV) — AA ≥4.5 ✅, cible 6.5 ✅.
 - `tsc` 0 · `eslint` 0 · build 0 · unit **33/33**.
 - e2e régression non-IA : `p9`+`p10`+`p11` **8/8 pass** (8.8s). IA toujours bloquée (erreur #16, ERRORS.md 26/08).
+- **Deploy PROD** ✅ `dpl_GRRpLSyfEfrWMfpFShmB7BouB5gh` (commit `26a770c`) — smoke `/` 200 · `/login` 200 · `/dashboard` 307→login · token `--on-primary: #1a0d05` présent dans le HTML live.
+
+## P5 — DA boucle round 3→4 : fix D11 badges teintés (26/08/2026)
+
+**DA r3 = 9,4/10 — BOUCLE: CONTINUER (1 défaut)** : R1 9,4 · R2 8,9 · R3 9,5 · R4 9,5 · R5 9,3 · R6 10 · R7 9,2. D1–D10 tenus (0 cible <44px, nav 72px, blur 20px, rayons {16,24}, 0 cliché IA, 0 overflow).
+
+**D11** : `text-*-on-dark` sur fonds teintés = 4,35:1. Cause racine palette : AA calé sur fond nu, pas sur le teinté composé.
+Fix généralisé (`src/lib/brand/palette.ts`, `ON_TINTED_AA = 6` sur les 3 `lightenUntilAa` — primary, secondary, alert).
+
+**Preuves** :
+- Probe alpha-blend `/tmp/probe-d11.mjs` : **50 badges teintés / 5 pages, min 5,22:1** ≥ 4,5:1 AA ✅ — `/dashboard` 3 (5,22 bg-primary/20, 5,68 /15) · `/objets` 33 (5,22 « En vente », 5,68 « Estimé », 8,10 « Scanné » secondary/15) · `/commandes` 8 (5,68) · `/aide` 1 · `/messages` 5.
+- CTA pleins inchangés : `--on-primary` D9 (6,58:1), zéro effet de bord.
+- `tsc` 0 · build 0 · unit **33/33** · e2e non-IA `p9`+`p10`+`p11` **8/8 pass**.

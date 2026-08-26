@@ -14,7 +14,8 @@ export interface BrandPalette {
   seed: string;
   /** Couleur d'action (remplissages, boutons) — corail. */
   primary: string;
-  /** Corail éclairci pour texte/bordure sur fond sombre (contraste AA ≥ 4,5:1). */
+  /** Corail éclairci pour texte/icône sur fond sombre OU teinté
+   *  `bg-primary/15|20` (AA ≥ 6:1 vs fond nu → ≥ 4,5:1 vs le teinté, D11). */
   primaryOnDark: string;
   /** Brun très sombre pour le texte posé sur un remplissage primary plein
    *  (CTA `bg-primary`) — AA ≥ 6,5:1. primaryOnDark NE sert PAS à ça : il
@@ -22,7 +23,7 @@ export interface BrandPalette {
   onPrimary: string;
   /** Accent secondaire — ambre/orange chaud. */
   secondary: string;
-  /** Ambre éclairci pour texte/bordure sur fond sombre (AA ≥ 4,5:1). */
+  /** Ambre éclairci pour texte/bordure sur fond sombre ou teinté (AA ≥ 6:1). */
   secondaryOnDark: string;
   /** Erreur — framboise, distincte des teintes d'action. */
   alert: string;
@@ -133,14 +134,19 @@ function generatePalette(seed: string): BrandPalette {
 
   const primaryHex = draftToHex(primaryDraft);
 
+  // D11 : AA 4,5:1 contre #0a0a0f nu ne suffit PAS sur les badges teintés
+  // (bg-primary/15|20 composé ≈ rgb(66,47,40) → 4,35:1). Cible 6:1 contre le
+  // fond nu → ≥ 4,5:1 contre le teinté (mesuré 6,09:1). Idem secondary/alert.
+  const ON_TINTED_AA = 6;
+
   return {
     seed,
     primary: primaryHex,
-    primaryOnDark: lightenUntilAa(primaryDraft, 4.5),
+    primaryOnDark: lightenUntilAa(primaryDraft, ON_TINTED_AA),
     onPrimary: darkenUntilContrast(primaryDraft, primaryHex, 6.5),
     secondary: draftToHex(secondaryDraft),
-    secondaryOnDark: lightenUntilAa(secondaryDraft, 4.5),
-    alert: lightenUntilAa(alertDraft, 4.5),
+    secondaryOnDark: lightenUntilAa(secondaryDraft, ON_TINTED_AA),
+    alert: lightenUntilAa(alertDraft, ON_TINTED_AA),
   };
 }
 
