@@ -92,13 +92,22 @@ export default async function DashboardPage() {
       {/* Parrainage V4 — consomme /signup?ref=… au premier passage */}
       <ReferralAttach />
 
-      {/* EX-K2 — 3 blocs universels above the fold */}
-      <div className="grid items-start gap-6 md:grid-cols-3">
+      {/* EX-K2 — 3 blocs universels above the fold. D5 : carrousel scroll-snap
+          mobile (cards 280px) au lieu d'une pile pleine largeur, grille dès md */}
+      <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 md:pb-0 md:gap-6 md:items-start">
         {referralCode && (
-          <ReferralCard code={referralCode} filleuls={filleuls} />
+          <div className="min-w-[280px] snap-start md:min-w-0">
+            <ReferralCard code={referralCode} filleuls={filleuls} />
+          </div>
         )}
-        {referralCode && <AmbassadorCard filleuls={filleuls} />}
-        <CrossPromoCard />
+        {referralCode && (
+          <div className="min-w-[280px] snap-start md:min-w-0">
+            <AmbassadorCard filleuls={filleuls} />
+          </div>
+        )}
+        <div className="min-w-[280px] snap-start md:min-w-0">
+          <CrossPromoCard />
+        </div>
       </div>
 
       {/* Compteur réel DB — 0 si 0 (jamais de chiffre inventé) */}
@@ -131,8 +140,8 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* Solde Vault + EX-J7 revenus annuels nets + alerte 250 € */}
-      <div className="grid items-start gap-6 md:grid-cols-2">
+      {/* Solde Vault + EX-J7 revenus annuels nets + alerte 250 €. D7 : 2 colonnes dès sm */}
+      <div className="grid items-start gap-6 sm:grid-cols-2">
         <VaultCard balance={balance} objectifs={objectifRows ?? []} />
         <FiscalCounter summary={fiscal} />
       </div>

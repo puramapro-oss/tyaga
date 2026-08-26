@@ -42,9 +42,9 @@
 
 ## P5 — Design polish ❌
 - [ ] DA boucle ≥9/10 (DESIGN-SCORE.md, 3 viewports)
-- [ ] EX-I4 PuramaBackground fond animé (braises CSS, reduced-motion → statique)
-- [ ] La Boucle signature (anneau progression Vida + braise framer-motion spring, reduced-motion → statique)
-- [ ] EX-I3 safe areas iOS (viewport-fit cover + env(safe-area-inset-bottom)) — i18n 16 langues → V1.1-BACKLOG (D19)
+- [x] EX-I4 PuramaBackground fond animé (braises CSS, reduced-motion → statique)
+- [x] La Boucle signature (anneau progression Vida + braise framer-motion spring, reduced-motion → statique)
+- [x] EX-I3 safe areas iOS (viewport-fit cover + env(safe-area-inset-bottom)) — i18n 16 langues → V1.1-BACKLOG (D19)
 
 ## P6 — QA + certification ❌
 - [ ] Playwright 100% SPEC (matrice traçabilité EX→preuve)

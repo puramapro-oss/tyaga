@@ -75,8 +75,9 @@ export default function ObjectifCard({ objectif }: { objectif: ObjectifRow }) {
       className={`glass flex flex-col gap-3 p-5 ${objectif.active ? '' : 'opacity-60'}`}
       aria-label={`Objectif ${objectif.label}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      {/* min-w-0 + flex-wrap : un label long ne pousse jamais les actions hors carte (D1/D2) */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-40">
           <p className="text-xs uppercase tracking-wide text-foreground-muted">
             {objectifTypeLabel(objectif.type)}
           </p>
@@ -125,7 +126,7 @@ export default function ObjectifCard({ objectif }: { objectif: ObjectifRow }) {
               </div>
             </form>
           ) : (
-            <p className="font-display text-lg">{objectif.label}</p>
+            <p className="break-words font-display text-lg">{objectif.label}</p>
           )}
         </div>
 
@@ -181,7 +182,7 @@ export default function ObjectifCard({ objectif }: { objectif: ObjectifRow }) {
           size={72}
         />
         <div
-          className="flex flex-1 flex-col gap-2"
+          className="flex min-w-0 flex-1 flex-col gap-2"
           aria-label="Progression de l’objectif"
         >
           <div className="h-2.5 w-full overflow-hidden rounded-pill bg-card">

@@ -160,3 +160,20 @@ FINAL : `completed \| released` + commission 450 / net 4050 (ordre test 4500). N
 ### Pièges rencontrés
 - Apostrophe droite `'` dans texte JSX → `react/no-unescaped-entities` casse le build (6 occurrences admin + aide). Règle : U+2019 `’` partout.
 - `getByText(...).first()` peut matcher un texte dans un `<details>` FERMÉ (hidden) → `toBeVisible` échoue 14 retries. Cibler un élément toujours visible (ex. `getByRole('link', { name: … })` de la carte contact).
+
+## P5 — Design polish (2026-08-26)
+
+### Implémentation
+- **EX-I4 `PuramaBackground`** (`src/components/shared/PuramaBackground.tsx`, monté `layout.tsx`) : 9 braises CSS montantes, positions/durées/délais **déterministes** (tableau fixe, 0 `Math.random` → 0 dérive SSR/CSR), calque `fixed inset-0 -z-10 pointer-events-none`, keyframes `braise-rise` GPU-only (`transform`/`opacity`, `will-change`), couleurs `color-mix(var(--primary))` + ton `secondary` (0 hex dur). `prefers-reduced-motion` → `animation:none`, opacité figée 0.22, braises gelées à 12vh.
+- **La Boucle signature** (`src/components/vida/BoucleRing.tsx`, framer-motion spring) : arc `strokeDashoffset` animé + braise (halo 7px + cœur 3.5px) qui naît au centre et migre vers le bout de l'arc (`delay 0.35s`, spring 50/14) ; `%` central `font-mono` ; `aria-label` contextuel (`role="img"`). `useReducedMotion()` → `initial:false` + `duration:0` (rendu statique immédiat). Intégré : `VaultCard` (objectif actif le plus proche par ratio, caption « Objectif le plus proche : « … » » / « Crée un objectif pour fermer La Boucle ») + `ObjectifCard` (anneau 72px à côté de la barre EX-H4, sélecteurs p7 intacts). Gem retiré du VaultCard (règle Chanel : une seule signature).
+- **EX-I3 safe areas** : `viewportFit:'cover'` (viewport export `layout.tsx`) + `NavLinks` BottomTabs `pb-[env(safe-area-inset-bottom)]` + `main` dashboard `padding-bottom: calc(72px + env(safe-area-inset-bottom))` (globals.css).
+- **D19** : i18n 16 langues → V1.1-BACKLOG (SPEC V1-CORE FR-only + Pilier 21, consigné DECISIONS.md).
+
+### Preuves
+- e2e `e2e/p11-design.spec.ts` **3/3** + régression `p10` **3/3** = 6/6 (14.0s) : 9 braises attachées + `animation-name: braise-rise` + z-index conteneur <0 ; `meta[name=viewport]` contient `viewport-fit=cover` ; anneau `role="img"` nommé `/La Boucle/` visible /dashboard + /vida.
+- `tsc --noEmit` exit=0 · `next build` 0 · unit **33/33** (`node --test tests/*.test.ts`).
+- **Deploy PROD** ✅ `dpl_JDiFpCa7oCiba1qiFTQWHJ8PVAFb` (smoke `https://tyaga.purama.dev/` → 200). Commit `a89990e`.
+
+### Piège rencontré
+- Tests unitaires : glob `src/lib/*.test.*` → 0 fichier (les tests vivent dans `tests/*.test.ts`). Toujours `npm run test:unit`.
+- Playwright `toBeLessThan` attend un Number : `evaluate` sur `getComputedStyle().zIndex` (string) → wrap `Number(…)`. Et z-index négatif se vérifie sur le CONTENEUR (`-z-10`), pas sur l'enfant absolu (calcule `auto` = 0).
