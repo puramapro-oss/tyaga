@@ -30,7 +30,7 @@
 | C2 net serveur `prix×(1−10%)` | e2e + SQL 10 rows `pct=10` `net=round(prix×0.90)` exact | PREUVES P2.2 | ✅ |
 | C3 commission affichée AVANT publication+vente | e2e p3/p4 (assert libellé 10 %) | PREUVES P2.2/P2.3 | ✅ |
 | C4 historique append-only | e2e re-demande = nouvelle ligne, ancienne conservée | PREUVES P2.2 | ✅ |
-| C5 jamais « vendu garanti » | inspecteur-juridique scan lexical | P6 ⏳ | ⏳ |
+| C5 jamais « vendu garanti » | scan lexical auditeur : seules occurrences « garanti » = pages légales + sanitizers IA `.replace(/garanti\w*/gi,'estimé')` (listing-ai.ts:57, estimate-ai.ts:91) | CERTIFIED.md §C5 (26/08) | ✅ 26/08 |
 
 ## EX-D — Annonce assistée
 
@@ -87,7 +87,7 @@
 | I3 responsive 375→1920, sidebar+bottom tabs, safe areas | probes overflow 0px @375/@768 (r2 D8, r3) + e2e p11 viewport-fit | PREUVES P5 r2/r3 | ✅ |
 | I4 PuramaBackground animé, pas fond statique | e2e p11 (9 braises, keyframes, z<0, reduced-motion) | PREUVES P5 | ✅ |
 | I5 Lighthouse ≥95 ×4 | Lighthouse 13.3.0 prod 26/08 : `/` perf 98 · a11y 100 · bp 96 · seo 100 ; `/login` 98/100/96/100 (/tmp/p6-lh-*.json) | ✅ ≥95 ×4 ×2 pages |
-| I6 anti-slop variante revente consumer | DA boucle ≥9/10 (r4 en cours) | DESIGN-SCORE.md | ⏳ r4 |
+| I6 anti-slop variante revente consumer | DA boucle r4 **VERT 9.36/10** (7 rubriques ≥9.1, 45 captures, 616 contrastes 0 échec AA) | DESIGN-SCORE.md ; CERTIFIED.md §I6 | ✅ 26/08 |
 
 ## EX-J — Transverse
 
@@ -95,12 +95,12 @@
 |---|---|---|---|
 | J1 tsc 0 + lint 0 + build 0 | chaque feature | PREUVES toutes sections (26/08 dernier run) | ✅ |
 | J2 erreurs FR + solution | e2e p10:105 (401 « Connecte-toi » réel) ; messages 503/429 SupportChat implémentés FR mais non couverts e2e | PREUVES P4 (401) ; 503/429 = implémentés, pas testés | ✅ (401 prouvé) |
-| J3 loading+error+empty chaque vue | inspecteur-utilisateur jury (P6) | P6 ⏳ | ⏳ |
+| J3 loading+error+empty chaque vue | états empty FR dans chaque vue clé (objets:90, dashboard:132, marketplace:81, vida:316) + fetches bornés `AbortSignal.timeout(30-45s)` + erreur FR live (/tmp/ectx.txt) | CERTIFIED.md §J3 (26/08) | ✅ 26/08 |
 | J4 IA s'appelle TYAGA | grep -ri 'claude' src/ → 6 hits serveur seulement (imports/models/commentaire), 0 .tsx, `model_used` jamais rendu | ✅ 26/08 |
 | J5 RLS 100% tables + colonnes sensibles | RLS ligne 13/13 tables (P2.3) + triggers freeze colonnes prouvés VPS 7/7 (A1-A6 BLOCKED, service PASSES, reverse_sale floor -49 pts) | PREUVES P6 correcteur 2/2 (/tmp/verify-out.txt + /tmp/v65.txt, 26/08) | ✅ 26/08 |
-| J6 rate limit + Zod + try/catch toutes API | jury-securite (P6) ; SupportChat rate 20/h/user → 429 FR (PREUVES P4 aide) | P6 ⏳ partiel | ⏳ |
+| J6 rate limit + Zod + try/catch toutes API | 17/18 routes rate-limitées + Zod tous bodies ; 18e = /api/internal/stripe-fulfillment double auth secret+signature Stripe (plus fort que rate limit) ; Upstash centralisé → V1.1 (D21) | CERTIFIED.md §J6 (26/08) | ✅ 26/08 |
 | J7 fiscal compteur + alerte 250€ | unit 6 + e2e `p8-fiscal.spec.ts` bannière frontière | PREUVES P2.7 | ✅ |
-| J8 0 placeholder/TODO/console.log/any, 0 faux chiffres | jury-bugs + inspecteur-juridique (P6) | P6 ⏳ | ⏳ |
+| J8 0 placeholder/TODO/console.log/any, 0 faux chiffres | scan lexical src/ par auditeur : 0 TODO, 0 FIXME, 0 Lorem, 0 console.log, 0 `: any` | CERTIFIED.md §J8 (26/08) | ✅ 26/08 |
 | J9 favicon + OG image custom TYAGA | `src/app/icon.tsx` (32) + `apple-icon.tsx` (180) + `opengraph-image.tsx` (1200×630, next/og) + `src/lib/og-logo.tsx` + layout metadata OG/twitter | BUILD:0 35 pages (26/08) | ✅ |
 
 ## EX-K — Accueil & navigation
@@ -112,8 +112,7 @@
 
 ## Bilan
 
-- ✅ prouvé : 45/52
-- ⏳ P6 (en cours) : 5 — C5, I6 (DA r4 → VERT 9.36, reste boucle formelle), J3, J6 (Upstash V1.1 différé → DECISIONS), J8 → portes par les juries P6
-- 🔒 IA différée : 2 — B3, D1 (testés verts 25/08 avant épuisement crédit ; re-audit groupé à la recharge, erreur #16 CLAUDE.md)
+- ✅ prouvé : 50/52 (auditeur-vierge a tranché les 5 ⏳ par preuve directe — CERTIFIED.md)
+- 🔒 IA différée : 2 — B3, D1 (testés verts 25/08 avant épuisement crédit ; re-audit groupé à la recharge, erreur #16 CLAUDE.md — admis par l'auditeur comme déferral authentique)
 
-Dernière mise à jour : 2026-08-26 (correcteur 2/2 : J5 ✅ VPS 7/7 triggers freeze colonnes, bilan 45/52).
+Dernière mise à jour : 2026-08-26 (**CERTIFIED.md 100/100 V1-CORE** — auditeur-vierge, commit `7af5a8c`, dpl `dpl_AVP5ckiSUKud2QVJY5KwDWmqbc89`, bilan 50/52 + 2 🔒 différés).
