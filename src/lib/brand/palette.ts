@@ -87,11 +87,32 @@ function draftToHex(d: HslDraft): string {
   return hslToHex(d.h, d.s, d.l);
 }
 
-/** Éclaircit la teinte par pas de +2 en luminosité jusqu'au contraste AA voulu. */
-function lightenUntilAa(draft: HslDraft, minRatio: number): string {
+/** Alpha de la couche glass des cartes (globals.css `--glass-bg`). */
+const GLASS_BG_ALPHA = 0.07;
+
+/** Fond RÉEL d'un badge teinté, pire cas : remplissage à `alpha` sur une carte
+ *  glass rgba(255,255,255,0.07) posée sur #0a0a0f. C'est contre CE composite
+ *  que le texte doit tenir AA, pas contre le fond nu — #dd804b fait 6,8:1 sur
+ *  le fond nu mais 4,35:1 sur bg-primary/20 + glass (DA r3 D11, mesuré). */
+function tintedCompositeWorstCase(fillHex: string, alpha: number): string {
+  const page = hexToRgb(BACKGROUND_HEX);
+  const glass = page.map((c) =>
+    Math.round(255 * GLASS_BG_ALPHA + c * (1 - GLASS_BG_ALPHA)),
+  );
+  const [r, g, b] = hexToRgb(fillHex);
+  const mix = (fg: number, bg: number) => Math.round(fg * alpha + bg * (1 - alpha));
+  const toHex = (x: number) => x.toString(16).padStart(2, '0');
+  return `#${toHex(mix(r, glass[0]))}${toHex(mix(g, glass[1]))}${toHex(mix(b, glass[2]))}`;
+}
+
+/** Éclaircit la teinte jusqu'au contraste voulu CONTRE LE COMPOSITE teinté
+ *  pire-cas (glass + alpha 0,20 — bg-primary/15 est plus sombre, donc plus
+ *  favorable). Cible 5:1 = AA 4,5:1 + réserve d'arrondi/variation d'alpha. */
+function lightenUntilTintedAa(draft: HslDraft, minRatio = 5): string {
+  const worstCase = tintedCompositeWorstCase(draftToHex(draft), 0.2);
   let d = { ...draft };
   let hex = draftToHex(d);
-  while (contrastRatio(hex, BACKGROUND_HEX) < minRatio && d.l < 96) {
+  while (contrastRatio(hex, worstCase) < minRatio && d.l < 96) {
     d = { ...d, l: d.l + 2 };
     hex = draftToHex(d);
   }
@@ -134,19 +155,17 @@ function generatePalette(seed: string): BrandPalette {
 
   const primaryHex = draftToHex(primaryDraft);
 
-  // D11 : AA 4,5:1 contre #0a0a0f nu ne suffit PAS sur les badges teintés
-  // (bg-primary/15|20 composé ≈ rgb(66,47,40) → 4,35:1). Cible 6:1 contre le
-  // fond nu → ≥ 4,5:1 contre le teinté (mesuré 6,09:1). Idem secondary/alert.
-  const ON_TINTED_AA = 6;
-
   return {
     seed,
     primary: primaryHex,
-    primaryOnDark: lightenUntilAa(primaryDraft, ON_TINTED_AA),
+    // D11 : cible le composite teinté pire-cas, PAS le fond nu — un calage
+    // « AA sur fond nu » est un no-op quand le draft y est déjà ≥ 4,5:1
+    // (#dd804b : 6,8:1 sur nu, 4,35:1 sur bg-primary/20 + glass).
+    primaryOnDark: lightenUntilTintedAa(primaryDraft),
     onPrimary: darkenUntilContrast(primaryDraft, primaryHex, 6.5),
     secondary: draftToHex(secondaryDraft),
-    secondaryOnDark: lightenUntilAa(secondaryDraft, ON_TINTED_AA),
-    alert: lightenUntilAa(alertDraft, ON_TINTED_AA),
+    secondaryOnDark: lightenUntilTintedAa(secondaryDraft),
+    alert: lightenUntilTintedAa(alertDraft),
   };
 }
 

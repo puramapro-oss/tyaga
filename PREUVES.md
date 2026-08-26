@@ -230,3 +230,12 @@ Fix généralisé (`src/lib/brand/palette.ts`, `ON_TINTED_AA = 6` sur les 3 `lig
 - Probe alpha-blend `/tmp/probe-d11.mjs` : **50 badges teintés / 5 pages, min 5,22:1** ≥ 4,5:1 AA ✅ — `/dashboard` 3 (5,22 bg-primary/20, 5,68 /15) · `/objets` 33 (5,22 « En vente », 5,68 « Estimé », 8,10 « Scanné » secondary/15) · `/commandes` 8 (5,68) · `/aide` 1 · `/messages` 5.
 - CTA pleins inchangés : `--on-primary` D9 (6,58:1), zéro effet de bord.
 - `tsc` 0 · build 0 · unit **33/33** · e2e non-IA `p9`+`p10`+`p11` **8/8 pass**.
+
+### D11-bis — le fix 6:1 était un no-op, vrai fix composite (26/08/2026)
+
+Commit c372a64 (ON_TINTED_AA=6) s'est révélé **no-op pour primary/secondary** : le draft #dd804b fait déjà 6,8:1 sur le fond nu → `lightenUntilAa` ne remontait jamais. Le probe v1 (blend direct sur fond page, sans la couche glass) donnait 5,22:1 fantôme ; le fond réel des badges = `bg-primary/20` + glass `rgba(255,255,255,.07)` + `#0a0a0f` = rgb(66,47,40) → 4,35:1 persistant (méthode DA r3 = exacte).
+
+Vrai fix : `lightenUntilTintedAa` cible le composite pire-cas `tintedCompositeWorstCase(fill, 0.20)` à 5:1.
+
+- Probe v2 plein-DOM (compositing de TOUTES les couches ancêtres, méthode DA) : **min global 5,11:1** / 50 badges / 5 pages — `#e29265` « 1 filleul »/« Actif »/« En vente » 5,11 · « Estimé »/icônes 5,59 · secondary « Scanné » inchangé (déjà 5,85) · alert `#e87d87` 5,08.
+- tsc 0 · build 0 · unit 33/33 · e2e non-IA p9+p10+p11 8/8.
