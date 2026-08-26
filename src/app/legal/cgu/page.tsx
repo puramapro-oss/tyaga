@@ -152,7 +152,8 @@ export default function CguPage() {
         <p>
           Ces CGU sont soumises au droit français. En cas de litige, écris
           d’abord à hello@tyaga.purama.dev — réponse sous 48 h, du lundi au
-          samedi.
+          samedi. À défaut d’accord amiable avec un consommateur, recours à
+          la médiation de la consommation, puis aux tribunaux compétents.
         </p>
       </LegalSection>
     </LegalShell>

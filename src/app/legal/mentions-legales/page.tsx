@@ -19,6 +19,10 @@ export default function MentionsLegalesPage() {
           {COMPANY_INFO.name} — {COMPANY_INFO.address}, France.
         </p>
         <p>
+          Directeur de la publication : le représentant légal de la{' '}
+          {COMPANY_INFO.name}.
+        </p>
+        <p>
           {COMPANY_INFO.legal}. Contact :{' '}
           <a
             href="mailto:hello@tyaga.purama.dev"

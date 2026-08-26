@@ -8,7 +8,7 @@
 | EX | Test | Preuve | Statut |
 |---|---|---|---|
 | A1 inscription email+confirm+login | e2e tous specs (login tyaga-e2e + comptes seller/buyer créés + confirmés admin API) | PREUVES P2.3/P2.4 (2 comptes réels persistants) | ✅ |
-| A2 Google OAuth EN VRAI | VPS `GOTRUE_EXTERNAL_GOOGLE_ENABLED`+`URI_ALLOW_LIST`+restart AVANT test manuel | task_plan P1 `[x]` (25/08) | ✅ |
+| A2 Google OAuth EN VRAI | VPS `GOTRUE_EXTERNAL_GOOGLE_ENABLED`+`URI_ALLOW_LIST`+restart AVANT test manuel ; e2e p1 redirection `accounts.google.com` | task_plan P1 `[x]` manuel (25/08) + e2e p1:124 redirection — session créée prouvée manuel, pas capturée | ✅ (partiel : redirection automatisée, session = manuel) |
 | A3 middleware redirect + profil auto | smoke prod `/dashboard`→307 `/login?next=` ; trigger schéma `tyaga` (schema.sql) | journal 25/08 deploys smoke ; P2 comptes auto-profilés | ✅ |
 | A4 signOut non mort | e2e p9 helper `logout` (clearCookies+storages) → middleware renvoie /login | PREUVES P3 piège re-login | ✅ |
 
@@ -17,7 +17,7 @@
 | EX | Test | Preuve | Statut |
 |---|---|---|---|
 | B1 3 photos capture/galerie → storage `tyaga-photos/{user}/{item}` | e2e `p2-scan.spec.ts` | P2.1 ✅ 25/08 (task_plan) | ✅ |
-| B2 sha256 + captured_at | e2e p2 (colonnes SQL) | P2.1 ✅ 25/08 | ✅ |
+| B2 sha256 + captured_at | SQL VPS `SELECT count(sha256), count(captured_at) FROM tyaga.item_photos` → 129/129 non-null, `storage_path` = `{user_id}/{item_id}/fichier` (PREUVES P6-B2) | PREUVES P6-B2 (26/08) | ✅ |
 | B3 IA vision <20s ou message FR | e2e p2 (`/api/scan`) | P2.1 ✅ 25/08 | 🔒 re-audit à la recharge |
 | B4 IA propose, user modifie | e2e p2 (champs éditables avant save) | P2.1 ✅ 25/08 | ✅ |
 | B5 item `scanned` + liste | e2e p2 + `/objets` (« Scanné » badge, probe D11) | P2.1 ✅ 25/08 + probe 26/08 | ✅ |
@@ -82,7 +82,7 @@
 
 | EX | Test | Preuve | Statut |
 |---|---|---|---|
-| I1 palette seed générée `/lib/brand/`, 0 hex dur composants | grep hex composants ; DA r1-r4 | PREUVES P4 (admin gold utilities) + DA | ✅ |
+| I1 palette seed générée `/lib/brand/`, 0 hex dur composants | grep hex composants (exceptions D20 : logo Google `AuthFields.tsx:84-96` + littéraux satori `opengraph-image.tsx`) ; DA r1-r4 | PREUVES P4 (admin gold utilities) + DA + D20 | ✅ |
 | I2 typo Bricolage+Geist | layout.tsx fonts | DA r1-r4 | ✅ |
 | I3 responsive 375→1920, sidebar+bottom tabs, safe areas | probes overflow 0px @375/@768 (r2 D8, r3) + e2e p11 viewport-fit | PREUVES P5 r2/r3 | ✅ |
 | I4 PuramaBackground animé, pas fond statique | e2e p11 (9 braises, keyframes, z<0, reduced-motion) | PREUVES P5 | ✅ |
@@ -94,7 +94,7 @@
 | EX | Test | Preuve | Statut |
 |---|---|---|---|
 | J1 tsc 0 + lint 0 + build 0 | chaque feature | PREUVES toutes sections (26/08 dernier run) | ✅ |
-| J2 erreurs FR + solution | e2e p10 (401 « Connecte-toi ») + SupportChat 503 FR | PREUVES P4 | ✅ |
+| J2 erreurs FR + solution | e2e p10:105 (401 « Connecte-toi » réel) ; messages 503/429 SupportChat implémentés FR mais non couverts e2e | PREUVES P4 (401) ; 503/429 = implémentés, pas testés | ✅ (401 prouvé) |
 | J3 loading+error+empty chaque vue | inspecteur-utilisateur jury (P6) | P6 ⏳ | ⏳ |
 | J4 IA s'appelle TYAGA | grep -ri 'claude' src/ → 6 hits serveur seulement (imports/models/commentaire), 0 .tsx, `model_used` jamais rendu | ✅ 26/08 |
 | J5 RLS 100% tables | matrice RLS 13/13 orders + jury-securite toutes tables (P6) | PREUVES P2.3 partiel | ⏳ P6 |

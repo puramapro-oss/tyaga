@@ -80,7 +80,9 @@ export default function CgvPage() {
         <p>
           Ces conditions sont soumises au droit français. En cas de litige,
           écris d’abord à hello@tyaga.purama.dev — réponse sous 48 h, du lundi
-          au samedi.
+          au samedi. À défaut d’accord amiable, recours gratuit au médiateur
+          de la consommation, puis aux tribunaux compétents du domicile du
+          consommateur.
         </p>
       </LegalSection>
     </LegalShell>

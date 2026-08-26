@@ -95,6 +95,9 @@ jamais « payé » (pas de versement bancaire V1).
 | 1 | CGU sans mention du caractère IA du brouillon d'annonce (AI Act) | **FIXÉ** 2026-08-26 — CGU §3 |
 | 2 | Pas de self-serve RGPD (export/suppression en un clic) | Conforme par e-mail — V1.1 backlog |
 | 3 | Pas de page settings/profil dédiée | Hors V1-CORE — V1.1 backlog |
+| 4 | Mentions légales sans directeur de publication (LCEN 6-III, jury juridique P6) | **FIXÉ** 2026-08-26 — « le représentant légal de la SASU PURAMA » |
+| 5 | Aucune mention médiation consommation (L612-1 C. conso, jury juridique P6) | **FIXÉ** 2026-08-26 — CGV §8 + CGU §13, médiateur générique (formulation flotte rita) |
+| 6 | SIRET/SIREN absent des mentions légales ; médiateur conso non nommé | **BUSINESS écosystème** — décision flotte (cf MANA : SIRET/médiateur = décision écosystème), INSEE clé absente du sandbox |
 
-REMEDIATION:tyaga:1/1:19b45b22f53f
+REMEDIATION:tyaga:2/2:19b45b22f53f
 VERDICT:tyaga:VERT

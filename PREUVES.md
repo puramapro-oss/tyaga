@@ -266,3 +266,17 @@ MATRICE.md créée (47 EX → test → preuve) : 41 ✅ / 4 ⏳ P6 juries / 2 �
 - **e2e p1** : fix `clearCookies` avant `/login` (piège `GOTRUE_MAILER_AUTOCONFIRM=true` : session partagée → redirect `/dashboard` → freeze exit 124). **4/4 pass** (12.4s).
 - **CONFORMITE.md** (Pilier 19) : 7 sections ✅, 3 écarts (1 FIXÉ CGU §3, 2 V1.1), verdict **VERT** `19b45b22f53f`.
 - tsc 0 · build 0 · lint 0.
+
+### P6 — Déploy prod + smoke (26/08/2026)
+
+- Commit `77cbdb7` (51 fichiers, +1723) → Vercel `dpl_2KiiaRLAXgHd3hGp7yDBtnNf8VZx` READY → alias `tyaga.purama.dev` (build 25 s, 35 pages, BUILD:0)
+- Smoke : `/` `/login` `/legal` `/legal/cgu` → 200
+- BUG détecté au smoke : `/icon` + `/opengraph-image` → 307 `/login` (middleware ignorait les routes metadata générées) → fix `75355b3` (isPublic +3 chemins) → redeploy → `/icon` `/apple-icon` `/opengraph-image` `/` → **200**
+- Ligne ERRORS.md ajoutée le jour même
+
+### P6 — Correcteur juries 1/2 (26/08/2026)
+
+- **B2 (jury-tests)** : SQL VPS `SELECT count(*), count(sha256), count(captured_at) FROM tyaga.item_photos` → **129/129 non-null** ; `storage_path` = `{user_id}/{item_id}/fichier` (ex `b2964235-…/d6805caa-…/face.jpg`). Colonnes NOT NULL par schema.sql + écrites par `/api/scan` à chaque upload — vérifié en prod le 26/08.
+- **Juridique (inspecteur-juridique)** : `mentions-legales` + « Directeur de la publication : le représentant légal de la SASU PURAMA » (LCEN 6-III) ; CGV §8 + CGU §13 + ligne médiation de la consommation (art. L612-1 C. conso, formulation flotte rita). SIRET/SIREN + médiateur nommé = écarts business écosystème → CONFORMITE.md.
+- **I1 (jury-tests)** : exceptions hex documentées → DECISIONS D20 (logo Google AuthFields + satori OG).
+- **A2/J2** : citations MATRICE reformulées exactes (A2 = redirection automatisée + session manuelle ; J2 = 401 prouvé, 503/429 implémentés non testés).
