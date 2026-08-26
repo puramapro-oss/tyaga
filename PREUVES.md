@@ -109,3 +109,20 @@ FINAL : `completed \| released` + commission 450 / net 4050 (ordre test 4500). N
 
 ### Qualité
 - `tsc --noEmit` exit=0 · `next build` 0 (routes /vida + 5 API vida) · unit 22/22 (`tests/vida.test.ts`).
+
+## P2.7 — EX-J7 Fiscal compteur + alerte 250€ ✅ (2026-08-26)
+
+**Seuil** : 250,00 € nets cumulés sur l'année fiscale en cours, alerte à `>=` (frontière incluse). D14 respecté : simple requête sur `ventes` (colonne `fiscal_year`), zéro table dédiée.
+
+### Implémentation
+- `src/lib/fiscal.ts` : `FISCAL_ALERT_THRESHOLD_CENTS = 25_000`, `fiscalSummary(sales, year)` (filtre année + somme nets + `alert` booléen), `formatEuros` (arrondi + fr-FR). Composant serveur pur.
+- `src/components/dashboard/FiscalCounter.tsx` : section `aria-label="Revenus annuels"` → montant nets + progression (`role="progressbar"`, % du seuil) sous 250 €, bannière `role="alert"` `aria-label="Alerte seuil fiscal 250 euros"` (amber) dès le seuil — barre masquée quand alerte active.
+- `dashboard/page.tsx` : `ventes` (net + fiscal_year) du vendeur dans le `Promise.all` existant → `fiscalSummary(rows, new Date().getFullYear())` → `<FiscalCounter/>`. Chiffres réels DB, 0 si 0.
+
+### Preuves (matrice EX-J7 → « PW : somme ventes ≥250€ → bannière »)
+- Unit `tests/fiscal.test.ts` (node:test, import dynamique `new URL(...)` miroir vida) — 6 tests : cumul année uniquement (année N-1 ignorée), vide → 0 sans alerte, 24 999 → false, frontière 25 000 → true, cumul 12 000+13 000 → true, seuil constant + `formatEuros`. **28/28** (22 vida + 6 fiscal).
+- e2e `e2e/p8-fiscal.spec.ts` : login vendeur → `/dashboard` compteur = cumul réel (`formatEuros(sumBefore)` byte-à-byte, NBSP inclus) → PATCH service dernière vente → 300 € nets (gross 33 333 / commission 3 333) → reload → bannière `Alerte seuil fiscal 250 euros` visible + « 250 € de revenus nets atteints cette année. » + montant `sumAfter` + `progressbar` count 0. **PASSED 1/1 (7.2 s)**.
+
+### Qualité
+- `tsc --noEmit` exit=0 · `next build` 0 · unit 28/28 · e2e p8 1/1.
+- Piège rencontré : `toLocaleString('fr-FR')` sépare les milliers par une espace insécable (U+00A0) — les assertions unit comparent sans séparateurs, l'e2e génère la même chaîne côté Node (byte-à-byte OK).

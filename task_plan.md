@@ -28,7 +28,7 @@
 - [x] P2.4 Inbox assistant + anti-fraude (1-clic jamais auto, plancher, regex hors plateforme) — EX-F ✅ (unit 17/17, e2e p5 1/1 34s, flagged_off_platform SQL prouvé — PREUVES.md)
 - [x] P2.5 Expédition guidée (checklist, adresse post-paiement, statuts manuels) — EX-G ✅ (e2e p6 1/1 29.8s : checklist 6 étapes, adresse post-paiement, expédié→reçu→completed+released SQL — PREUVES.md)
 - [x] P2.6 Vida Vault sandbox (points 1pt=1€, 0/30/50/100%, objectifs CRUD) — EX-H ✅ (e2e p7 1/1 39s : points crédités SQL, proposition 50%, confirmation explicite 2-step, progression + wallet débité/objectif crédité SQL ; grep 0 appel virement ; unit 22/22 — PREUVES.md)
-- [ ] Fiscal compteur + alerte 250€ — EX-J7
+- [x] Fiscal compteur + alerte 250€ — EX-J7 ✅ (lib fiscal + FiscalCounter dashboard, unit 6 + e2e p8 1/1 bannière ≥250€)
 
 ## P3 — Universels ❌
 - [ ] Parrainage V4 (N1=50% + carte à vie)
@@ -62,3 +62,4 @@
 - 2026-08-25 — P2.4 EX-F ✅ : inbox temps réel (poll 5s) + suggestions 1-clic (jamais auto) + plancher vendeur (refus poli sous plancher, contre = plancher exact) + regex anti-hors-plateforme (IBAN/RIB/PayPal/WhatsApp/Telegram/Revolut/Lydia/tél/email) message bloqué + `flagged_off_platform`. Unit 17/17 · tsc 0 · e2e p5 1/1 (34s, 2 comptes, preuve SQL PostgREST).
 - 2026-08-25 — P2.5 EX-G ✅ : checklist emballage 6 étapes (localStorage par commande, vendeur payée uniquement) + adresse livraison vend. post-paiement + suivi manuel expédié/reçu → completed + séquestre released (ventes + Connect via finalize). e2e p6 1/1 (29.8s, paiement simulé service rôle webhook, preuve SQL PostgREST) · tsc 0 · build 0 · unit 17/17.
 - 2026-08-25 — P2.6 EX-H ✅ : Vida Vault sandbox — wallet points auto (trigger+credit_wallet via finalize), propositions 0/30/50/100 % jamais auto, confirmation explicite 2-step RPC `confirm_transfer` (SECURITY DEFINER après fix RLS : wallet sans policy UPDATE volontaire), objectifs CRUD + progression, bannière sandbox permanente. e2e p7 1/1 (39s, SQL deltas wallet/objectif) · grep 0 appel virement · tsc 0 · build 0 · unit 22/22. P2 core = 6/6 features B→H.
+- 2026-08-26 — P2.7 EX-J7 ✅ : compteur revenus nets annuels /dashboard (requête ventes, D14 zéro table dédiée) + bannière alerte dès 250 € nets cumulés (`>=`, progressbar → alert). Unit 28/28 (6 fiscal) · e2e p8 1/1 (7.2s, PATCH service 300 € nets déterministe, bannière+montant+barre masquée) · tsc 0 · build 0. **P2 7/7 features B→J terminé.** Prochain : P3 Universels.

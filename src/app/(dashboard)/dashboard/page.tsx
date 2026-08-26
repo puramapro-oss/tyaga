@@ -1,12 +1,13 @@
 import { Camera } from 'lucide-react';
 import Link from 'next/link';
 
+import FiscalCounter from '@/components/dashboard/FiscalCounter';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { fiscalSummary } from '@/lib/fiscal';
 import { formatDate } from '@/lib/utils';
 
 /**
- * Accueil P1 : état réel du compte (profil + compteur annonces). La brique
- * Scan (P2.1) remplacera l'état vide par l'entrée caméra.
+ * Accueil : état réel du compte (profil + compteur annonces + revenus EX-J7).
  */
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
@@ -14,20 +15,30 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, created_at')
-    .eq('id', user!.id)
-    .single();
-
-  const { count: itemCount } = await supabase
-    .from('items')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user!.id)
-    .neq('status', 'draft');
+  const [{ data: profile }, { data: itemCountRows }, { data: ventesRows }] =
+    await Promise.all([
+      supabase
+        .from('profiles')
+        .select('full_name, created_at')
+        .eq('id', user!.id)
+        .single(),
+      supabase
+        .from('items')
+        .select('id')
+        .eq('user_id', user!.id)
+        .neq('status', 'draft'),
+      supabase
+        .from('ventes')
+        .select('net_amount_cents, fiscal_year')
+        .eq('seller_id', user!.id),
+    ]);
+  const itemCount = itemCountRows?.length ?? 0;
 
   const firstName =
     profile?.full_name?.split(' ')[0] || user!.email?.split('@')[0] || 'toi';
+
+  // EX-J7 — compteur fiscal : cumul nets de l'année en cours (D14 : requête)
+  const fiscal = fiscalSummary(ventesRows ?? [], new Date().getFullYear());
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -71,6 +82,9 @@ export default async function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* EX-J7 — revenus annuels nets + alerte 250 € */}
+      <FiscalCounter summary={fiscal} />
     </div>
   );
 }
