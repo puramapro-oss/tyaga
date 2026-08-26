@@ -448,3 +448,61 @@ ALTER TABLE tyaga.profiles ADD COLUMN IF NOT EXISTS stripe_connect_account_id te
 
 -- Session Checkout par commande
 ALTER TABLE tyaga.marketplace_orders ADD COLUMN IF NOT EXISTS stripe_checkout_session_id text;
+
+-- ============ EX-H fonctions (2026-08-25) ============
+-- Crédit wallet atomique, réservé au rôle service (jamais exposé au client)
+CREATE OR REPLACE FUNCTION tyaga.credit_wallet(p_user uuid, p_points integer)
+RETURNS void LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = tyaga, public AS $$
+BEGIN
+  IF p_points IS NULL OR p_points <= 0 THEN RETURN; END IF;
+  INSERT INTO tyaga.vida_wallet (user_id, balance_points, total_earned_points)
+  VALUES (p_user, p_points, p_points)
+  ON CONFLICT (user_id) DO UPDATE
+  SET balance_points = tyaga.vida_wallet.balance_points + p_points,
+      total_earned_points = tyaga.vida_wallet.total_earned_points + p_points,
+      updated_at = now();
+END $$;
+
+REVOKE ALL ON FUNCTION tyaga.credit_wallet(uuid, integer) FROM PUBLIC, anon, authenticated;
+
+-- Confirmation explicite d'un transfert proposé : wallet → objectif, atomique.
+-- SECURITY DEFINER : vida_wallet n'a AUCUNE policy UPDATE volontairement
+-- (écrits service uniquement) — l'autorisation est v_tr.user_id = auth.uid(),
+-- vérifiée en tête de fn avant tout débit.
+CREATE OR REPLACE FUNCTION tyaga.confirm_transfer(p_transfer uuid)
+RETURNS integer LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = tyaga, public AS $$
+DECLARE
+  v_user uuid := auth.uid();
+  v_tr tyaga.vida_transfers;
+  v_pts integer;
+BEGIN
+  IF v_user IS NULL THEN RETURN 0; END IF;
+  SELECT * INTO v_tr FROM tyaga.vida_transfers
+   WHERE id = p_transfer AND user_id = v_user AND status = 'proposed'
+   FOR UPDATE;
+  IF NOT FOUND THEN RETURN 0; END IF;
+  v_pts := v_tr.points_amount;
+
+  -- 0 % = garder sur le wallet : on enregistre juste la décision
+  IF v_pts = 0 OR v_tr.objectif_id IS NULL THEN
+    UPDATE tyaga.vida_transfers SET status = 'confirmed', confirmed_at = now() WHERE id = p_transfer;
+    RETURN 1;
+  END IF;
+
+  UPDATE tyaga.vida_wallet
+     SET balance_points = balance_points - v_pts, updated_at = now()
+   WHERE user_id = v_user AND balance_points >= v_pts;
+  IF NOT FOUND THEN RETURN -1; END IF;
+
+  UPDATE tyaga.vida_objectifs
+     SET current_points = current_points + v_pts, updated_at = now()
+   WHERE id = v_tr.objectif_id AND user_id = v_user AND active;
+  IF NOT FOUND THEN RETURN -2; END IF;
+
+  UPDATE tyaga.vida_transfers SET status = 'confirmed', confirmed_at = now() WHERE id = p_transfer;
+  RETURN 1;
+END $$;
+
+GRANT EXECUTE ON FUNCTION tyaga.confirm_transfer(uuid) TO authenticated;

@@ -85,3 +85,27 @@ FINAL : `completed \| released` + commission 450 / net 4050 (ordre test 4500). N
 
 ### Qualité
 - `tsc --noEmit` exit=0 · `next build` 0 · unit 17/17.
+
+## P2.6 — EX-H Vida Vault sandbox ✅ (2026-08-25)
+
+### Implémentation
+- H1 : wallet `vida_wallet` auto-créé inscription (trigger schema.sql) + `credit_wallet` SECURITY DEFINER idempotent appelé par `finalizeCompletedSale` (vente completed → net crédité, 1 pt = 1 € net).
+- H2 : `/vida` section « Ventes à répartir » → radio 0/30/50/100 % + select objectif, POST `/api/vida/transfers` (Zod, rate limit) → statut `proposed`. Jamais automatique.
+- H3 : étape 2 « À confirmer » → carte proposition + bouton « Confirmer le transfert » → RPC `tyaga.confirm_transfer` (SECURITY DEFINER, `user_id = auth.uid()` + statut proposed vérifiés en tête, SELECT FOR UPDATE) : débit wallet atomique + crédit objectif ; codes -1 solde / -2 objectif. Annulation possible.
+- H4 : `ObjectifCard` barre progression + `X / Y pts` ; objectifs CRUD (`/api/vida/objectifs` + `[id]` archive).
+- H5 : bannière sandbox permanente « Aucun virement bancaire n'est effectué » + footer ; grep code vida (`payout|virement|transfers.create`) = 0 appel API — uniquement libellés UI d'avertissement.
+
+### Fix DB (pré-e2e)
+- Bug : `confirm_transfer` SECURITY INVOKER + `vida_wallet` sans policy UPDATE (volontaire : écrits service uniquement) → UPDATE 0 rows → faux « solde insuffisant » (-1).
+- Fix : `ALTER FUNCTION tyaga.confirm_transfer(uuid) SECURITY DEFINER` (appliqué VPS live + schema.sql). Autorisation reste en tête de fn (`auth.uid()` + `proposed`), rejet de l'alternative « policy UPDATE wallet » (permettrait au client d'écrire un solde arbitraire).
+
+### e2e p7 (`e2e/p7-vida.spec.ts` PASSED 39.0s, 1 worker)
+- Parcours complet 2 comptes réels : publication → achat → checkout.stripe.com (aucune carte) → paiement simulé service (rôle webhook) → expédié → reçu → completed → vente créée.
+- EX-H1 (SQL) : `ventes.net_amount_cents` → `netPts` ; solde wallet `before ≥ netPts` (delta, comptes persistants).
+- EX-H5 : « Sandbox : » visible. EX-H4 : création objectif (100 pts) → « 0 / 100 pts ».
+- EX-H2 : radio 50 % + select objectif → « Proposer » → carte « Proposition en attente de ta confirmation » + objectif TOUJOURS 0 (rien avant confirmation). Purge service des `proposed` antérieurs (comptes persistants) pour isoler le run.
+- EX-H3 : clic « Confirmer le transfert » (jamais auto). EX-H4 : objectif passe à `transferredPts / 100 pts` + historique puce « Confirmé ».
+- SQL finale : wallet `after === before - transferredPts` ; `vida_objectifs.current_points === transferredPts`, `target_points = 100`.
+
+### Qualité
+- `tsc --noEmit` exit=0 · `next build` 0 (routes /vida + 5 API vida) · unit 22/22 (`tests/vida.test.ts`).

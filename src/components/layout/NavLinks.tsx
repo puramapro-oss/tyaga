@@ -1,6 +1,6 @@
 'use client';
 
-import { Camera, Home, Box, MessageCircle, Package, Store } from 'lucide-react';
+import { Camera, Home, Box, MessageCircle, Package, Sparkles, Store } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -16,6 +16,7 @@ const LINKS = [
   { href: '/marketplace', label: 'Marketplace', icon: Store, exact: false },
   { href: '/messages', label: 'Messages', icon: MessageCircle, exact: false },
   { href: '/commandes', label: 'Commandes', icon: Package, exact: true },
+  { href: '/vida', label: 'Points Vida', icon: Sparkles, exact: true },
 ] as const;
 
 export function SidebarNav() {

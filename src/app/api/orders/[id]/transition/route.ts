@@ -11,6 +11,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { pointsFromNet } from '@/lib/vida';
 
 /**
  * EX-E3 — transitions de commande par action de la bonne partie.
@@ -147,6 +148,15 @@ async function finalizeCompletedSale(
     fiscal_year: new Date().getFullYear(),
   });
   if (venteError?.code !== '23505' && venteError) return;
+
+  // EX-H1 : wallet Vida crédité en points (1 pt = 1 € net) uniquement quand la
+  // ligne de vente est NOUVELLE — un rejeu (23505) ne crédite jamais deux fois.
+  if (venteError === null) {
+    const points = pointsFromNet(order.net_amount_cents);
+    if (points > 0) {
+      await service.rpc('credit_wallet', { p_user: sellerId, p_points: points });
+    }
+  }
 
   // Virement Connect si le vendeur a un compte — jamais bloquant pour la vente
   const { data: profile } = await service
