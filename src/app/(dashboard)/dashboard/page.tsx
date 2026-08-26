@@ -28,6 +28,7 @@ export default async function DashboardPage() {
     { data: ventesRows },
     { data: wallet },
     { data: filleulRows },
+    { data: objectifRows },
   ] = await Promise.all([
     supabase
       .from('profiles')
@@ -52,6 +53,11 @@ export default async function DashboardPage() {
       .from('referrals')
       .select('id')
       .eq('referrer_id', user!.id),
+    supabase
+      .from('vida_objectifs')
+      .select('label, current_points, target_points')
+      .eq('user_id', user!.id)
+      .eq('active', true),
   ]);
   const itemCount = itemCountRows?.length ?? 0;
   const filleuls = filleulRows?.length ?? 0;
@@ -127,7 +133,7 @@ export default async function DashboardPage() {
 
       {/* Solde Vault + EX-J7 revenus annuels nets + alerte 250 € */}
       <div className="grid items-start gap-6 md:grid-cols-2">
-        <VaultCard balance={balance} />
+        <VaultCard balance={balance} objectifs={objectifRows ?? []} />
         <FiscalCounter summary={fiscal} />
       </div>
     </div>

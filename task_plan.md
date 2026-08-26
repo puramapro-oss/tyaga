@@ -40,9 +40,11 @@
 - [x] /admin (super-admin gold) : users, commandes, litiges, logs — gate serveur email canonique OU `profiles.is_super_admin` (e2e via flag, jamais le compte réel), lecture seule V1, stats (utilisateurs/commandes/ventes/litiges) + tables récentes + logs Stripe, or via `--super-admin-gold` + utilities
 - [x] /aide + FAQ + chatbot SAV — 6 catégories accordéon natif (0 JS), SupportChat haiku-4-5 (auth+rate 20/h+Zod+historique 6 tours+503 FR contact humain), contact mailto visible
 
-## P5 — Design polish + i18n ❌
+## P5 — Design polish ❌
 - [ ] DA boucle ≥9/10 (DESIGN-SCORE.md, 3 viewports)
-- [ ] Animations (La Boucle signature, reduced-motion) + i18n 16 langues
+- [ ] EX-I4 PuramaBackground fond animé (braises CSS, reduced-motion → statique)
+- [ ] La Boucle signature (anneau progression Vida + braise framer-motion spring, reduced-motion → statique)
+- [ ] EX-I3 safe areas iOS (viewport-fit cover + env(safe-area-inset-bottom)) — i18n 16 langues → V1.1-BACKLOG (D19)
 
 ## P6 — QA + certification ❌
 - [ ] Playwright 100% SPEC (matrice traçabilité EX→preuve)

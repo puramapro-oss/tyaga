@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Archive, ArchiveRestore, Check, Pencil, Trash2, X } from 'lucide-react';
 
+import BoucleRing from '@/components/vida/BoucleRing';
 import { objectifTypeLabel, progression } from '@/lib/vida';
 
 export interface ObjectifRow {
@@ -172,21 +173,31 @@ export default function ObjectifCard({ objectif }: { objectif: ObjectifRow }) {
         )}
       </div>
 
-      {/* EX-H4 : progression barre + montant */}
-      <div className="flex flex-col gap-2" aria-label="Progression de l’objectif">
-        <div className="h-2.5 w-full overflow-hidden rounded-pill bg-card">
-          <div
-            className="h-full rounded-pill bg-primary transition-[width] duration-500"
-            style={{ width: `${p.pct}%` }}
-          />
+      {/* EX-H4 : progression anneau (La Boucle) + barre + montant */}
+      <div className="flex items-center gap-4">
+        <BoucleRing
+          current={objectif.current_points}
+          target={objectif.target_points}
+          size={72}
+        />
+        <div
+          className="flex flex-1 flex-col gap-2"
+          aria-label="Progression de l’objectif"
+        >
+          <div className="h-2.5 w-full overflow-hidden rounded-pill bg-card">
+            <div
+              className="h-full rounded-pill bg-primary transition-[width] duration-500"
+              style={{ width: `${p.pct}%` }}
+            />
+          </div>
+          <p className="text-sm text-foreground-muted" aria-live="polite">
+            <span className="font-semibold text-foreground">
+              {objectif.current_points} / {objectif.target_points} pts
+            </span>{' '}
+            ({p.pct} %){!p.complete && ` — encore ${p.remainingPoints} pts`}
+            {p.complete && ' — objectif atteint 🌿'}
+          </p>
         </div>
-        <p className="text-sm text-foreground-muted" aria-live="polite">
-          <span className="font-semibold text-foreground">
-            {objectif.current_points} / {objectif.target_points} pts
-          </span>{' '}
-          ({p.pct} %){!p.complete && ` — encore ${p.remainingPoints} pts`}
-          {p.complete && ' — objectif atteint 🌿'}
-        </p>
       </div>
 
       {error && (

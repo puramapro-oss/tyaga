@@ -70,7 +70,7 @@ export function SidebarNav() {
 export function BottomTabs() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-10 flex h-[72px] items-center justify-around border-t border-border bg-background/90 backdrop-blur md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-10 flex min-h-[72px] items-center justify-around border-t border-border bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       {LINKS.map(({ href, label, icon: Icon, exact }) => {
         const active = exact ? pathname === href : pathname.startsWith(href);
         return (

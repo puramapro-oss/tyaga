@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Geist, Geist_Mono } from 'next/font/google';
 
 import { paletteCssVars, tyagaPalette } from '@/lib/brand/palette';
 import { APP_NAME } from '@/lib/constants';
+import PuramaBackground from '@/components/shared/PuramaBackground';
 
 import './globals.css';
 
@@ -38,6 +39,8 @@ export const viewport: Viewport = {
   themeColor: tyagaPalette.primary,
   width: 'device-width',
   initialScale: 1,
+  // EX-I3 — safe areas iOS : laisse env(safe-area-inset-*) s'appliquer
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -55,6 +58,8 @@ export default function RootLayout({
             __html: `:root {\n    ${paletteCssVars(tyagaPalette)}\n  }`,
           }}
         />
+        {/* EX-I4 — braises montantes, derrière tout le contenu */}
+        <PuramaBackground />
         {children}
       </body>
     </html>

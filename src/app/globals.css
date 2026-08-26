@@ -141,10 +141,56 @@ input:-webkit-autofill:focus {
   transition: background-color 9999s ease-in-out 0s;
 }
 
-/* Réserve la hauteur de la barre d'onglets mobile (position:fixed hors flux) */
+/* Réserve la hauteur de la barre d'onglets mobile (position:fixed hors flux) —
+   env(safe-area-inset-bottom) couvre la barre gestuelle iOS (viewport-fit cover). */
 @media (max-width: 767px) {
   main {
-    padding-bottom: 72px;
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+}
+
+/* EX-I4 — PuramaBackground : braises montantes (La Boucle du lâcher-prise).
+   Couleurs via color-mix sur les tokens identité, 0 hex dur. */
+.braise {
+  position: absolute;
+  bottom: -3vh;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--primary) 85%, white 15%) 0%,
+    color-mix(in srgb, var(--primary) 55%, transparent) 55%,
+    transparent 75%
+  );
+  box-shadow: 0 0 14px color-mix(in srgb, var(--primary) 45%, transparent);
+  opacity: 0;
+  animation: braise-rise 22s linear infinite;
+  will-change: transform, opacity;
+}
+
+.braise[data-tone='secondary'] {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--secondary) 85%, white 15%) 0%,
+    color-mix(in srgb, var(--secondary) 55%, transparent) 55%,
+    transparent 75%
+  );
+  box-shadow: 0 0 14px color-mix(in srgb, var(--secondary) 45%, transparent);
+}
+
+@keyframes braise-rise {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  10% {
+    opacity: var(--braise-opacity, 0.5);
+  }
+  82% {
+    opacity: var(--braise-opacity, 0.5);
+  }
+  100% {
+    transform: translate3d(var(--braise-drift, 3vw), -112vh, 0);
+    opacity: 0;
   }
 }
 
@@ -180,5 +226,13 @@ input:-webkit-autofill:focus {
   [class*='transition-all'] {
     transition-property: color, background-color, border-color, box-shadow,
       opacity !important;
+  }
+
+  /* Braises figées — lueur douce statique, zéro déplacement */
+  .braise {
+    animation: none;
+    opacity: 0.22;
+    bottom: 12vh;
+    transform: none;
   }
 }
