@@ -1,6 +1,15 @@
 'use client';
 
-import { Camera, Home, Box, MessageCircle, Package, Sparkles, Store } from 'lucide-react';
+import {
+  Camera,
+  CircleHelp,
+  Home,
+  Box,
+  MessageCircle,
+  Package,
+  Sparkles,
+  Store,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -41,6 +50,19 @@ export function SidebarNav() {
           </Link>
         );
       })}
+      {/* Aide : sidebar seulement — les bottom tabs mobile restent à 7 */}
+      <Link
+        href="/aide"
+        aria-current={pathname.startsWith('/aide') ? 'page' : undefined}
+        className={`flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors ${
+          pathname.startsWith('/aide')
+            ? 'bg-card text-foreground'
+            : 'text-foreground-muted hover:bg-card/60 hover:text-foreground'
+        }`}
+      >
+        <CircleHelp size={17} />
+        Aide
+      </Link>
     </nav>
   );
 }

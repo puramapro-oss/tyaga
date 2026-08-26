@@ -143,3 +143,20 @@ FINAL : `completed \| released` + commission 450 / net 4050 (ordre test 4500). N
 
 ### Piège rencontré
 - Re-login même contexte Playwright : session active → middleware `/login`→`/dashboard` → `input[type="email"]` jamais rendu (timeout 60s). Fix : helper `logout` (`clearCookies` + `localStorage.clear` + `sessionStorage.clear`) avant chaque changement d'utilisateur.
+## P4 — Admin + Aide + FAQ ✅ (2026-08-26)
+
+### Implémentation
+- **`/admin` God Mode lecture seule** : gate serveur `isSuperAdmin(user.email) || profiles.is_super_admin` (force-dynamic) → redirect `/login?next=/admin` si non connecté, `/dashboard` si non admin. Stats count (utilisateurs/commandes/ventes complétées/litiges `flagged_off_platform`) + 10 dernières lignes (profiles, marketplace_orders, ventes, inbox_messages flaggées, logs `stripe_events_processed`). Or via `--super-admin-gold` + utilities `.text-gold/.border-gold/.bg-gold-soft` — 0 hex dur composant.
+- **`/aide`** : FAQ 6 catégories 16 entrées (`lib/faq.ts`) accordéon natif `<details>` (0 JS) + SupportChat (`/api/ai/support` : auth 401 FR, rate 20/h/user 429 FR, Zod, haiku-4-5 max 400 tok timeout 20 s, historique 6 tours, 503 FR → contact humain) + carte contact mailto `hello@tyaga.purama.dev` toujours visible.
+- **Nav** : Aide sidebar-only (`NavLinks.tsx`) + icône header mobile (`(dashboard)/layout.tsx`) — bottom tabs restent à 7.
+
+### Preuves
+- e2e `e2e/p10-admin-aide.spec.ts` **3/3 (13.0s)** :
+  1. `/aide` rendu : 6 catégories, accordéon `details` ≥6, suggestions rapides, textarea label, mailto visible.
+  2. `/api/ai/support` non connecté → 401 + « Connecte-toi ».
+  3. Gate admin : flag off → `/admin` redirige `/dashboard`, 0 heading God Mode ; flag on → heading + `.text-gold` + Utilisateurs/Commandes/Litiges ; flag off → referme. ZÉRO appel IA (aucun crédit brûlé), compte réel jamais créé/connecté.
+- `tsc --noEmit` exit=0 · `next build` 0 · unit 33/33.
+
+### Pièges rencontrés
+- Apostrophe droite `'` dans texte JSX → `react/no-unescaped-entities` casse le build (6 occurrences admin + aide). Règle : U+2019 `’` partout.
+- `getByText(...).first()` peut matcher un texte dans un `<details>` FERMÉ (hidden) → `toBeVisible` échoue 14 retries. Cibler un élément toujours visible (ex. `getByRole('link', { name: … })` de la carte contact).

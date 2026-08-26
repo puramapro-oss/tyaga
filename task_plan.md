@@ -36,9 +36,9 @@
 - [x] Ambassadeur
 - [x] Solde Vault + 4 blocs above the fold (EX-K2)
 
-## P4 — Admin + Aide + FAQ ❌
-- [ ] /admin (super-admin gold) : users, commandes, litiges, logs
-- [ ] /aide + FAQ + chatbot SAV
+## P4 — Admin + Aide + FAQ ✅
+- [x] /admin (super-admin gold) : users, commandes, litiges, logs — gate serveur email canonique OU `profiles.is_super_admin` (e2e via flag, jamais le compte réel), lecture seule V1, stats (utilisateurs/commandes/ventes/litiges) + tables récentes + logs Stripe, or via `--super-admin-gold` + utilities
+- [x] /aide + FAQ + chatbot SAV — 6 catégories accordéon natif (0 JS), SupportChat haiku-4-5 (auth+rate 20/h+Zod+historique 6 tours+503 FR contact humain), contact mailto visible
 
 ## P5 — Design polish + i18n ❌
 - [ ] DA boucle ≥9/10 (DESIGN-SCORE.md, 3 viewports)
@@ -65,3 +65,4 @@
 - 2026-08-25 — P2.6 EX-H ✅ : Vida Vault sandbox — wallet points auto (trigger+credit_wallet via finalize), propositions 0/30/50/100 % jamais auto, confirmation explicite 2-step RPC `confirm_transfer` (SECURITY DEFINER après fix RLS : wallet sans policy UPDATE volontaire), objectifs CRUD + progression, bannière sandbox permanente. e2e p7 1/1 (39s, SQL deltas wallet/objectif) · grep 0 appel virement · tsc 0 · build 0 · unit 22/22. P2 core = 6/6 features B→H.
 - 2026-08-26 — P2.7 EX-J7 ✅ : compteur revenus nets annuels /dashboard (requête ventes, D14 zéro table dédiée) + bannière alerte dès 250 € nets cumulés (`>=`, progressbar → alert). Unit 28/28 (6 fiscal) · e2e p8 1/1 (7.2s, PATCH service 300 € nets déterministe, bannière+montant+barre masquée) · tsc 0 · build 0. **P2 7/7 features B→J terminé.** Prochain : P3 Universels.
 - 2026-08-26 — P3 ✅ EX-K2 + Parrainage V4 : 4 blocs above the fold /dashboard (parrainage code `TY-XXXXXX` copiable, ambassadeur, cross-promo VIDA/KASH WELCOME50, solde Vault). Boucle parrainage complète : `profiles.referral_code` (trigger+RPC `ensure_referral_code`), `/signup?ref=` → sessionStorage → `ReferralAttach` → POST `/api/referral/attach` → RPC `attach_referral` (self/already/invalid), N1 = `payReferralN1` 50% commission en points Vault branché `finalizeCompletedSale` (flag `commission_paid`, jamais bloquant). Unit 33/33 (5 referral) · e2e p9 2/2 (15.1s : blocs + rattachement filleul → compteur 1 + garde self) · tsc 0. Prochain : P4 Admin+Aide.
+- 2026-08-26 — P4 ✅ Admin+Aide : `/admin` God Mode lecture seule (gate serveur `isSuperAdmin(email) || profiles.is_super_admin`, e2e via PATCH flag — compte réel jamais créé/connecté ; stats count + 10 dernières lignes users/commandes/ventes/litiges `flagged_off_platform`/logs `stripe_events_processed` ; or `--super-admin-gold` + `.text-gold/.border-gold/.bg-gold-soft`, 0 hex dur composant). `/aide` : FAQ 6 catégories 16 entrées accordéon natif + SupportChat (`/api/ai/support` : auth 401 FR, rate 20/h/user 429 FR, Zod, haiku-4-5 max 400 tok timeout 20 s, historique 6 tours client+serveur, 503 FR → hello@tyaga.purama.dev) + carte contact humain. Nav : Aide sidebar-only + icône header mobile (bottom tabs restent 7). e2e p10 3/3 (13.0s : rendu /aide, 401 API, gate non-admin→dashboard / flag→God Mode or / flag off→dashboard) · tsc 0 · build 0 · unit 33/33. Prochain : P5 Design+i18n.

@@ -31,6 +31,9 @@
   --glass-border: rgba(255, 255, 255, 0.34);
   --glass-blur: 20px;
 
+  /* Super-admin — or écosystème (CLAUDE.md §4), hors palette identité app */
+  --super-admin-gold: #ffd700;
+
   /* Radii */
   --radius-sm: 0.5rem;
   --radius-md: 1rem;
@@ -151,6 +154,19 @@ input:-webkit-autofill:focus {
     backdrop-filter: blur(var(--glass-blur)) saturate(150%);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-lg);
+  }
+
+  /* God Mode — or écosystème super-admin */
+  .text-gold {
+    color: var(--super-admin-gold);
+  }
+
+  .border-gold {
+    border-color: color-mix(in srgb, var(--super-admin-gold) 45%, transparent);
+  }
+
+  .bg-gold-soft {
+    background: color-mix(in srgb, var(--super-admin-gold) 10%, transparent);
   }
 
   .text-balance {

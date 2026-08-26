@@ -1,4 +1,6 @@
 import { redirect } from 'next/navigation';
+import { CircleHelp } from 'lucide-react';
+import Link from 'next/link';
 
 import LogoutButton from '@/components/layout/LogoutButton';
 import { BottomTabs, SidebarNav } from '@/components/layout/NavLinks';
@@ -72,7 +74,16 @@ export default async function DashboardLayout({
         {/* Header mobile */}
         <header className="flex items-center justify-between border-b border-border px-5 py-3 md:hidden">
           <span className="font-display text-lg">TYAGA</span>
-          <LogoutButton compact />
+          <div className="flex items-center gap-1">
+            <Link
+              href="/aide"
+              aria-label="Aide"
+              className="flex h-11 w-11 items-center justify-center rounded-pill text-foreground-muted transition-colors hover:bg-card/60 hover:text-foreground"
+            >
+              <CircleHelp size={19} />
+            </Link>
+            <LogoutButton compact />
+          </div>
         </header>
 
         <main className="flex-1 p-5 md:p-8">{children}</main>
