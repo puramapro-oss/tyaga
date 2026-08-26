@@ -204,7 +204,7 @@ export default function ScanPage() {
             type="button"
             onClick={analyse}
             disabled={!ready || busy !== null}
-            className="flex h-12 items-center justify-center gap-2 rounded-pill bg-primary px-6 text-sm font-semibold text-primary-on-dark transition-opacity disabled:opacity-40"
+            className="flex h-12 items-center justify-center gap-2 rounded-pill bg-primary px-6 text-sm font-semibold text-on-primary transition-opacity disabled:opacity-40"
           >
             {busy === 'analyse' ? (
               <>
@@ -282,7 +282,7 @@ export default function ScanPage() {
             type="button"
             onClick={save}
             disabled={busy !== null}
-            className="flex h-12 items-center justify-center gap-2 rounded-pill bg-primary px-6 text-sm font-semibold text-primary-on-dark transition-opacity disabled:opacity-40"
+            className="flex h-12 items-center justify-center gap-2 rounded-pill bg-primary px-6 text-sm font-semibold text-on-primary transition-opacity disabled:opacity-40"
           >
             {busy === 'save' ? (
               <>

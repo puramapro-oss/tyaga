@@ -133,7 +133,7 @@ export default function TransferProposal({
             type="button"
             disabled={busy}
             onClick={() => decide('confirm')}
-            className="flex h-11 items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-white disabled:opacity-50"
+            className="flex h-11 items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-on-primary disabled:opacity-50"
           >
             <Check size={16} />
             {busy ? 'Traitement…' : 'Confirmer le transfert'}
@@ -232,7 +232,7 @@ export default function TransferProposal({
       <button
         type="submit"
         disabled={busy || (pct > 0 && objectifs.length === 0)}
-        className="flex h-11 items-center justify-center rounded-pill bg-primary px-5 text-sm font-semibold text-white disabled:opacity-50"
+        className="flex h-11 items-center justify-center rounded-pill bg-primary px-5 text-sm font-semibold text-on-primary disabled:opacity-50"
       >
         {busy ? 'Enregistrement…' : `Proposer ${versedPts} pts`}
       </button>

@@ -129,7 +129,7 @@ export default function SupportChat() {
           type="submit"
           disabled={pending || !input.trim()}
           aria-label="Envoyer la question"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-primary text-foreground transition-opacity disabled:opacity-40"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill bg-primary text-on-primary transition-opacity disabled:opacity-40"
         >
           <Send size={17} />
         </button>

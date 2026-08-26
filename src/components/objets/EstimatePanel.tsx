@@ -54,7 +54,7 @@ export default function EstimatePanel({
         type="button"
         onClick={estimate}
         disabled={loading}
-        className="flex h-11 w-fit items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-primary-on-dark disabled:opacity-60"
+        className="flex h-11 w-fit items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-on-primary disabled:opacity-60"
       >
         <Sparkles size={16} className={loading ? 'animate-pulse' : undefined} />
         {loading

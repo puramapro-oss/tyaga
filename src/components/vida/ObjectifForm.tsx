@@ -112,7 +112,7 @@ export default function ObjectifForm() {
       <button
         type="submit"
         disabled={busy}
-        className="flex h-11 items-center justify-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
+        className="flex h-11 items-center justify-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-on-primary transition-opacity disabled:opacity-50"
       >
         <Plus size={16} />
         {busy ? 'Création…' : 'Créer l’objectif'}

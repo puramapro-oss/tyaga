@@ -187,7 +187,7 @@ export default function Thread({ conversationId, myId }: { conversationId: strin
               <div
                 className={`flex max-w-[85%] flex-col gap-1 rounded-xl px-4 py-2.5 text-sm leading-relaxed ${
                   mine
-                    ? 'bg-primary text-primary-on-dark'
+                    ? 'bg-primary text-on-primary'
                     : 'bg-card border border-border text-foreground'
                 }`}
               >
@@ -265,7 +265,7 @@ export default function Thread({ conversationId, myId }: { conversationId: strin
         <button
           type="submit"
           disabled={sending || draft.trim() === ''}
-          className="flex h-11 w-11 items-center justify-center rounded-pill bg-primary text-primary-on-dark transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
+          className="flex h-11 w-11 items-center justify-center rounded-pill bg-primary text-on-primary transition-transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60"
           aria-label="Envoyer"
         >
           {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

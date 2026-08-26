@@ -92,7 +92,7 @@ export default async function ObjetsPage() {
           </p>
           <Link
             href="/scan"
-            className="flex h-11 items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-primary-on-dark"
+            className="flex h-11 items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-on-primary"
           >
             <Camera size={16} />
             Scanner un objet

@@ -16,6 +16,10 @@ export interface BrandPalette {
   primary: string;
   /** Corail éclairci pour texte/bordure sur fond sombre (contraste AA ≥ 4,5:1). */
   primaryOnDark: string;
+  /** Brun très sombre pour le texte posé sur un remplissage primary plein
+   *  (CTA `bg-primary`) — AA ≥ 6,5:1. primaryOnDark NE sert PAS à ça : il
+   *  éclaircit une teinte déjà AA sur fond sombre, donc ≈ primary → invisible. */
+  onPrimary: string;
   /** Accent secondaire — ambre/orange chaud. */
   secondary: string;
   /** Ambre éclairci pour texte/bordure sur fond sombre (AA ≥ 4,5:1). */
@@ -93,6 +97,18 @@ function lightenUntilAa(draft: HslDraft, minRatio: number): string {
   return hex;
 }
 
+/** Assombrit la teinte par pas de −2 en luminosité jusqu'au contraste voulu
+ *  CONTRE la couleur de remplissage (texte sombre sur CTA plein). */
+function darkenUntilContrast(draft: HslDraft, fill: string, minRatio: number): string {
+  let d = { ...draft };
+  let hex = draftToHex(d);
+  while (contrastRatio(hex, fill) < minRatio && d.l > 4) {
+    d = { ...d, l: d.l - 2 };
+    hex = draftToHex(d);
+  }
+  return hex;
+}
+
 function generatePalette(seed: string): BrandPalette {
   const rand = seededRandom(seed);
 
@@ -115,10 +131,13 @@ function generatePalette(seed: string): BrandPalette {
   // Erreur : framboise ~350°, hors fenêtre chaleur, saturée — distincte de l'action.
   const alertDraft: HslDraft = { h: 348 + rand() * 8, s: 70, l: 58 };
 
+  const primaryHex = draftToHex(primaryDraft);
+
   return {
     seed,
-    primary: draftToHex(primaryDraft),
+    primary: primaryHex,
     primaryOnDark: lightenUntilAa(primaryDraft, 4.5),
+    onPrimary: darkenUntilContrast(primaryDraft, primaryHex, 6.5),
     secondary: draftToHex(secondaryDraft),
     secondaryOnDark: lightenUntilAa(secondaryDraft, 4.5),
     alert: lightenUntilAa(alertDraft, 4.5),
@@ -137,7 +156,9 @@ export function paletteCssVars(p: BrandPalette): string {
   return [
     `--primary: ${p.primary};`,
     `--primary-on-dark: ${p.primaryOnDark};`,
+    `--on-primary: ${p.onPrimary};`,
     `--primary-rgb: ${rgbTriplet(p.primary)};`,
+    `--on-primary-rgb: ${rgbTriplet(p.onPrimary)};`,
     `--primary-on-dark-rgb: ${rgbTriplet(p.primaryOnDark)};`,
     `--secondary: ${p.secondary};`,
     `--secondary-on-dark: ${p.secondaryOnDark};`,

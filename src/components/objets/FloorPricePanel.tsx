@@ -100,7 +100,7 @@ export default function FloorPricePanel({ itemId, floorCents, priceCents }: Floo
         <button
           type="submit"
           disabled={loading}
-          className="mt-5 flex h-11 items-center gap-2 rounded-pill bg-primary px-5 text-sm font-medium text-primary-on-dark transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+          className="mt-5 flex h-11 items-center gap-2 rounded-pill bg-primary px-5 text-sm font-medium text-on-primary transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
         >
           {loading ? <Loader2 size={15} className="animate-spin" /> : saved ? <Check size={15} /> : null}
           {saved ? 'Enregistré' : 'Enregistrer'}

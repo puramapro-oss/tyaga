@@ -86,8 +86,11 @@ export default async function MarketplacePage() {
         </section>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
+          {/* D8 : min-w-0 sur chaque li — sans lui le grid item prend sa
+              largeur max-content et le truncate du titre ne retient plus
+              l'overflow 375px (li mesuré à 443px dans une piste de 335px) */}
           {cards.map((c) => (
-            <li key={c.id}>
+            <li key={c.id} className="min-w-0">
               <Link
                 href={`/marketplace/${c.id}`}
                 className="glass flex gap-4 p-4 transition-colors hover:border-primary/40"

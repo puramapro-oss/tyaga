@@ -216,7 +216,7 @@ export default function AnnoncePanel({
           type="button"
           onClick={publish}
           disabled={!validated || publishing}
-          className="flex h-11 w-fit items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-primary-on-dark disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-11 w-fit items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-on-primary disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Megaphone size={16} />
           {publishing ? 'Publication…' : 'Publier sur la marketplace'}
@@ -246,7 +246,7 @@ export default function AnnoncePanel({
         type="button"
         onClick={generate}
         disabled={loading}
-        className="flex h-11 w-fit items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-primary-on-dark disabled:opacity-60"
+        className="flex h-11 w-fit items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-on-primary disabled:opacity-60"
       >
         <Sparkles size={16} className={loading ? 'animate-pulse' : undefined} />
         {loading ? 'TYAGA rédige l’annonce…' : 'Générer l’annonce'}

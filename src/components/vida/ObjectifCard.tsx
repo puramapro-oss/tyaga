@@ -105,7 +105,7 @@ export default function ObjectifCard({ objectif }: { objectif: ObjectifRow }) {
                 <button
                   type="submit"
                   disabled={busy}
-                  className="flex h-10 flex-1 items-center justify-center gap-2 rounded-pill bg-primary px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  className="flex h-10 flex-1 items-center justify-center gap-2 rounded-pill bg-primary px-4 text-sm font-semibold text-on-primary disabled:opacity-50"
                 >
                   <Check size={15} />
                   Enregistrer

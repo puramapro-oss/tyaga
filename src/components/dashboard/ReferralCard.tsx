@@ -73,7 +73,7 @@ export default function ReferralCard({
           <button
             type="button"
             onClick={() => copy('link')}
-            className="flex h-11 items-center justify-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-primary-on-dark"
+            className="flex h-11 items-center justify-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-on-primary"
           >
             {copied === 'link' ? (
               <>

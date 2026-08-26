@@ -1,64 +1,48 @@
-# DESIGN-SCORE.md — TYAGA (audit DA, contexte vierge)
+# TYAGA — DESIGN-SCORE.md (Round 2 — 2026-08-26)
 
-Date : 2026-08-26 · Méthode : build `next build` + `next start -p 3199`, captures Playwright 3 viewports × 5 pages (DSF 2), jugé sur pixels vus, jamais sur le code.
+Directeur artistique VEGA (Pilier 9.4), contexte vierge, juge l'écran rendu.
+Méthode : serveur `next start -p 3199`, compte e2e `tyaga-e2e@purama-test.dev` (données Vida + historique), 5 pages × 3 viewports (375×720, 768×1024, 1440×900), captures full-page dans `/tmp/da-r2/` + audit DOM/piixels (styles calculés, ratios de contraste WCAG, chaînes d'overflow, tokens résolus). Fonctionnalités IA non pénalisées (crédit API épuisé, annoncé).
 
-Captures : `/tmp/tyaga-da/<viewport>-<page>.png` (mobile-375 / tablet-768 / desktop-1280 × login, dashboard, vida, marketplace, scan).
+**Captures** : `login-{m375,t768,d1440}.png`, `dashboard-{…}.png`, `vida-{…}.png`, `marketplace-{…}.png`, `aide-{…}.png` (dans `/tmp/da-r2/`). Preuves machine : `/tmp/da-r2/audit.json`, `/tmp/da-r2/overflow-report.json`, `/tmp/da-r2/audit2.out`.
 
-## 1. Grille des scores (0-10)
+---
 
-| Page | R1 Identité | R2 Anti-slop | R3 Lisibilité | R4 Tokens | R5 Responsive | R6 Boucle | R7 Finitions |
-|---|---|---|---|---|---|---|---|
-| login mobile | 9.5 | 9 | 9.5 | 9 | 8.5 | 8.5 | 9 |
-| login tablet | 9.5 | 9 | 9.5 | 9 | 9 | 8.5 | 9 |
-| login desktop | 9.5 | 9.5 | 9.5 | 9 | 9 | 9 | 9.5 |
-| dashboard mobile | 9.5 | 9 | 9 | 9 | 9 | 9.5 | 8 |
-| dashboard tablet | 9 | 8.5 | 9 | 9 | 8.5 | 9.5 | 8.5 |
-| dashboard desktop | 9.5 | 9.5 | 9.5 | 9.5 | 9.5 | 9.5 | 9 |
-| vida mobile | 8.5 | 8.5 | 8.5 | 8.5 | **4** | 7.5 | 6 |
-| vida tablet | 8.5 | 8.5 | 8.5 | 8.5 | **4.5** | 7.5 | 6 |
-| vida desktop | 8.5 | 8.5 | 9 | 9 | 8.5 | 8 | 7 |
-| marketplace mobile | 9 | 9 | 9 | 9 | 9 | 7.5 | 9 |
-| marketplace tablet | 9 | 9 | 9 | 9 | 9 | 7.5 | 9 |
-| marketplace desktop | 9 | 9 | 9 | 9 | 9 | 7.5 | 9 |
-| scan mobile | 9 | 9 | 9.5 | 9 | 9 | 7.5 | 9 |
-| scan tablet | 9 | 9 | 9.5 | 9 | 9 | 7.5 | 9 |
-| scan desktop | 9 | 9 | 9.5 | 9 | 9.5 | 8 | 9.5 |
+## Fixations Round 1 vérifiées
 
-## 2. Moyennes par rubrique
+| Déffect R1 | Verdict R2 | Preuve |
+|---|---|---|
+| D1 overflow ObjectifCard | CORRIGÉ | `/dashboard-m375` scrollW 375 = clientW 375 ; débordements restants = cartes snap-carousel `min-w-[280px]` volontaires |
+| D2 /vida 2 colonnes mobile | CORRIGÉ | grids `/vida-m375` = 1 colonne (piste 303px) |
+| D3 vedette anneau « La Boucle » | CORRIGÉ | « LA BOUCLE — OBJECTIF EN TÊTE » présent + anneau SVG 128px, 4 cercles de progression, à 375 ET 1440 |
+| D6 braises /login | NON RE-FLAGGÉ | keyframes `braise-rise` actives + spans braises animés 3-6px (y:217-580) |
+| D4, D5, D7 | CORRIGÉS visuellement | carousel promo snap OK @375 ; Vault/Fiscal 2×200px seulement @768 ; aucun débordement 768 |
 
-| R1 Identité mémorable | R2 Anti-slop | R3 Lisibilité & hiérarchie | R4 Cohérence tokens | R5 Responsive 375→1280 | R6 Signature « La Boucle » | R7 Finitions |
-|---|---|---|---|---|---|---|
-| **9.07** | **8.93** | **9.17** | **8.97** | **8.33** | **8.20** | **8.43** |
+---
 
-**Moyenne globale : 8.73/10**
+## Notes R1-R7
 
-## 3. Ce qui est vu et tenu
+| # | Rubrique | Mini | Maxi | Moyenne | Observations (ce que je vois) |
+|---|---|---|---|---|---|
+| R1 | Écran accueil/login | 5 | 5 | **5.0** | Carte glass 327px @375 / 448px centrée (x:160) @768, H1 24px Bricolage Grotesque ls -0.6px, braises animées = signature vivante. MAIS le CTA « Se connecter » a son label **invisible** : color=fill=bg=#dd804b, aucun text-shadow (forensique `/tmp/da-r2/cta-final.mjs`). Le contrôle n°1 de l'écran est muet — disqualifiant pour ≥9. |
+| R2 | Dashboard | 6 | 7 | **6.5** | Hiérarchie exemplaire H1 30px/600 → H2 20px/600, chiffres Geist Mono, snap-carousel KPI 280px mobile, sidebar 280px @1440, glass 6× blur 20px. Même bug sur « Copier mon lien d'invitation » (`dashboard/page.tsx:134` `bg-primary text-primary-on-dark`) : label #dd804b sur fond #dd804b. Contrastes texte 44/45 ≥4.5 ailleurs. |
+| R3 | Fluidité layout mobile | 5 | 7 | **6.0** | Bottom-nav fixe 72px @375, colonnes uniques, snaps horizontaux contenus (body ne scrolle pas) sur dashboard/vida/aide. MAIS `/marketplace` @375 : scroll horizontal de page entier (voir R6) — la sensation mobile casse sur 1 page clé sur 5. |
+| R4 | Cohérence tokens | 6.5 | 7.5 | **7.0** | Fond html/body `rgb(10,10,15)` = #0A0A0F exact partout ; glass `--glass-bg 0.07` + blur 20px vérifiés ; pill (9999rem) + radii 24/16px tenus ; identité braise légitime (primary #dd804b, secondary #d9b958 — override par app conforme GOD MODE V4, pas un des 3 clichés). Défaut : **2 patterns CTA cohabitent** (`text-primary-on-dark` invisible vs `text-white` 2.89:1) — le token sémantique on-primary est cassé (voir D9). |
+| R5 | Vie/soba écrans clés | 6.5 | 8.5 | **7.5** | /vida est le plus riche : eyebrow « LA BOUCLE », anneau progression 128px, historique mono, objectifs — raconte le sacrifice (points donnés) en un regard. /marketplace dense (cards glass 24px radius, pad 16) mais la liste déborde à 375. Sobriété tenue, zéro cliché IA interdit. |
+| R6 | Overflow 375/768 | 4 | 10 | **5.0** | @768 et @1440 : 0 débordement sur les 5 pages. @375 : `/marketplace` **scrollW 463 vs 375 (+88px)** — `li` de 443px dans une piste grid de 335px (`ul.grid.gap-4.sm:grid-cols-2`, li min-width:auto, chaîne min-w-0 rompue au niveau li). Les 4 autres pages @375 sont propres. Un scroll horizontal de page = faute grave unique mais rédhibitoire. |
+| R7 | Hiérarchie typo/espacements | 8.5 | 9.5 | **9.0** | Échelle stricte 30/20/18/16/14/12px, graisse 600 display / 400-500 body, paire Bricolage Grotesque + Geist + Geist Mono tenue sur les 5 pages sans exception, gap-4/6 régulier, ls négatif sur H1, échelle de largeurs de contenu par page (1024/896/768/672) cohérente. |
 
-- Identité chaude (braise/corail sur `#0A0A0F`) immédiatement distincte du violet Purama par défaut — n'importe quel cliché IA (crème+serif, noir+vert acide, journal hairlines) est évité. Logo anneau + braise lu sur les 5 pages.
-- Login desktop tient en 1 écran (2560×1800 @2x = exactement le viewport) : carte glass centrée, hiérarchie display Bricolage → corps Geist → prix mono tenue partout.
-- Dashboard desktop : sidebar 280px + carte Vault avec anneau de progression et braises visibles, densité pro, zéro scroll. Mobile : bottom tabs 5 avec scanner central proéminent — conforme au DESIGN-PLAN §3.
-- Scan : stepper minimal, 1 action par écran, tenu sur les 3 viewports.
-- Marketplace : cards photo-first ratio 4:5, badge état, prix nets Geist Mono corail — la promesse Vinted × Back Market est tenue.
-- Contrastes : muted sur `#0A0A0F` largement AA, prix corail sur glass lisibles.
+---
 
-## 4. Défauts — précis, actionnables
+## Moyenne globale : **6.57 / 10**
 
-| # | Fichier / élément | Défaut vu | Correction proposée |
-|---|---|---|---|
-| D1 | `src/app/(dashboard)/vida/page.tsx` — bloc large (historique transferts ou anneau) | **Overflow horizontal mobile** : capture 926px @2x = 463px CSS vs 375px viewport → 88px de contenu tronqué à droite | Ajouter `min-w-0` sur tous les enfants de chaînes flex ; wrapper la liste historique dans `overflow-x-auto` ; chasser toute largeur fixe `w-[…]` > 343px (375 − 2×16 padding) |
-| D2 | `src/app/(dashboard)/vida/page.tsx` — même bloc | **Overflow horizontal tablette** : 1634px @2x = 817px CSS vs 768px → 49px tronqués. Même cause que D1, se manifeste jusqu'à ≥768px | Même fix que D1 ; vérifier à 768 et 834 après patch |
-| D3 | `src/app/(dashboard)/vida/page.tsx` — structure globale | Page-colonne unique de 2324px (mobile) / 3096px (tablette) / 2648px (desktop) : rythme qui traîne, objectifs ET historique empilés même à 1280px | Desktop : `lg:grid-cols-[1fr_400px]` — objectifs à gauche, solde + historique à droite ; resserrer les gaps verticaux (`space-y` réduit d'un cran) |
-| D4 | `src/app/(dashboard)/vida/page.tsx` — header objectif | **La Boucle absente de LA page objectif Vida** : barres de progression plates, pas d'anneau, pas de braises — la signature vit seulement sur /dashboard | Reprendre le même composant anneau + braises (celui de la carte Vault du dashboard) autour de l'objectif principal ; `prefers-reduced-motion` → statique |
-| D5 | `src/app/(dashboard)/dashboard/page.tsx` — pile promo | Dashboard mobile = 3598px CSS de scroll : parrainage + ambassadeur + VIDA empilés en full-width, respiration excessive en bas de page | Regrouper parrainage / ambassadeur / cross-promo VIDA en 1 carrousel horizontal scroll-snap (cards 280px) ou 1 section à onglets ; viser < 2600px |
-| D6 | `src/app/(auth)/login/page.tsx` — fond | Signature portée uniquement par le glow radial sur login/marketplace/scan (R6 = 7.5) : la 1re seconde d'app ne montre pas encore « La Boucle » | Sur login : 3-4 braises montantes discrètes (particules CSS absolute, opacité ≤ 0.5, derrière la carte) pour asseoir la signature dès l'arrivée. Chanel rule respectée : rien d'autre d'ajouté |
-| D7 | `src/app/(dashboard)/dashboard/page.tsx` — grille tablette | À 768px le dashboard reste un empilement mobile étiré (R5 8.5) : cartes full-width, aucune colonne | Passer les blocs Vault/Scanner en 2 colonnes dès `sm:` (640-1024px) |
+## Verdict : **BOUCLE: CONTINUER**
 
-Aucun défaut de contraste bloquant, aucun emoji-icône vu, aucun hex visiblement hors-système, aucun des 3 looks interdits.
+---
 
-## 5. Verdict
+## Défauts restants (transmis au correcteur)
 
-Rubriques sous 9 : R5 (8.33, tirée par vida mobile 4 / vida tablet 4.5), R6 (8.20), R7 (8.43) — plus R2 à 8.93.
+- **D8 — /marketplace @375px : débordement horizontal de page +88px.** `ul.grid.gap-4.sm:grid-cols-2` (liste des annonces) : chaque `li` rend 443px pour une piste de 335px. Le `a.glass.flex.gap-4` interne a bien `min-w-0 flex-1` mais le `li` (grid item, `min-width:auto`) n'a pas de `min-w-0` → min-content du bloc texte (titre tronqué non contraignant) pousse l'item hors piste. Fix : `min-w-0` (ou `overflow-hidden`) sur les `li` de cette liste ; re-vérifier scrollW=375.
+- **D9 — Token `--primary-on-dark` cassé : labels de CTA invisibles partout où `bg-primary` est plein.** `palette.ts:121` : `primaryOnDark: lightenUntilAa(primaryDraft, 4.5)` → #dd804b est déjà ≥4.5:1 sur fond sombre, donc aucun éclaircissement → `--primary-on-dark` = #dd804b = `--primary`. Tout bouton `bg-primary text-primary-on-dark` écrit #dd804b sur #dd804b. Preuves mesurées : `/login` « Se connecter » (innerHTML = texte brut du bouton, color=fill=bg, shadow:none) et `/dashboard` « Copier mon lien d'invitation » (`dashboard/page.tsx:134`). Touché aussi (code identique) : `page.tsx:46` (accueil), `messages/page.tsx:56`, `objets/page.tsx:95`, `scan/page.tsx:207,285`, `EstimatePanel.tsx:57`, `AnnoncePanel.tsx:219,249`. Fix : définir `--on-primary: #1a0f08` (contraste 6.5:1 sur #dd804b) et remplacer `text-primary-on-dark` par `text-on-primary` sur toutes les surfaces `bg-primary` pleines (le token `primary-on-dark` reste correct sur fonds sombres / `bg-primary/15`).
+- **D10 — /vida : CTAs blancs sur primaire = 2.89:1 (< 4.5 AA).** « Proposer 24 pts » ×2 et « Créer l'objectif » (14px/600) : blanc sur #dd804b mesuré 2.89:1. Fichiers : `components/vida/TransferProposal.tsx:136,235`, `ObjectifForm.tsx:115`, `ObjectifCard.tsx:108`. Fix : même `text-on-primary #1a0f08` que D9 — unifie au passage les deux patterns CTA de l'app.
 
-**BOUCLE: CONTINUER**
-
-Conditions du vert : D1+D2 (overflows vida) corrigés et re-capturés à 375/768, D3 (layout 2 colonnes vida desktop), D4 (anneau La Boucle sur /vida), D5 (réduction pile promo dashboard mobile). D6/D7 recommandés.
+Ordre de passage : D9 (bloquant, systémique, 1 token + ~12 remplacements) → D8 (1 classe) → D10 (couvert par D9). Après correctif : re-capture 5 pages × 3 viewports, re-note. D6 braises vérifiées présentes — ne pas re-flagger.

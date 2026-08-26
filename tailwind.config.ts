@@ -13,6 +13,8 @@ const config: Config = {
         foreground: 'rgb(var(--foreground-rgb) / <alpha-value>)',
         primary: 'rgb(var(--primary-rgb) / <alpha-value>)',
         'primary-on-dark': 'rgb(var(--primary-on-dark-rgb) / <alpha-value>)',
+        // D9 : texte sur CTA bg-primary PLEIN (sombre) — primary-on-dark y est invisible
+        'on-primary': 'rgb(var(--on-primary-rgb) / <alpha-value>)',
         secondary: 'rgb(var(--secondary-rgb) / <alpha-value>)',
         'secondary-on-dark': 'rgb(var(--secondary-on-dark-rgb) / <alpha-value>)',
         alert: 'rgb(var(--alert-rgb) / <alpha-value>)',

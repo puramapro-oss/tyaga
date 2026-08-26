@@ -105,7 +105,7 @@ export default function BuyPanel({ annonceId, priceCents }: BuyPanelProps) {
         <button
           type="submit"
           disabled={loading}
-          className="mt-1 flex h-12 items-center justify-center gap-2 rounded-pill bg-primary font-medium text-primary-on-dark transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+          className="mt-1 flex h-12 items-center justify-center gap-2 rounded-pill bg-primary font-medium text-on-primary transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
         >
           {loading ? (
             <Loader2 size={16} className="animate-spin" />

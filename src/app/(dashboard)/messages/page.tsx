@@ -53,7 +53,7 @@ export default async function MessagesPage() {
           </p>
           <Link
             href="/marketplace"
-            className="flex h-11 items-center rounded-pill bg-primary px-5 text-sm font-medium text-primary-on-dark transition-transform hover:scale-[1.01] active:scale-[0.99]"
+            className="flex h-11 items-center rounded-pill bg-primary px-5 text-sm font-medium text-on-primary transition-transform hover:scale-[1.01] active:scale-[0.99]"
           >
             Explorer la marketplace
           </Link>

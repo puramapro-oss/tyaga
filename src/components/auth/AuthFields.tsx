@@ -113,7 +113,7 @@ export function SubmitButton({
     <button
       type="submit"
       disabled={loading}
-      className="flex h-12 items-center justify-center gap-2 rounded-pill bg-primary font-medium text-primary-on-dark transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
+      className="flex h-12 items-center justify-center gap-2 rounded-pill bg-primary font-medium text-on-primary transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60"
     >
       {loading && <Loader2 size={18} className="animate-spin" />}
       {label}

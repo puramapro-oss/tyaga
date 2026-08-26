@@ -43,7 +43,7 @@ export default function HomePage() {
         <div className="flex w-full flex-col gap-3">
           <Link
             href="/signup"
-            className="flex h-12 items-center justify-center rounded-pill bg-primary font-medium text-primary-on-dark transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            className="flex h-12 items-center justify-center rounded-pill bg-primary font-medium text-on-primary transition-transform hover:scale-[1.02] active:scale-[0.98]"
           >
             Commencer
           </Link>

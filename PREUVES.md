@@ -177,3 +177,43 @@ FINAL : `completed \| released` + commission 450 / net 4050 (ordre test 4500). N
 ### Piège rencontré
 - Tests unitaires : glob `src/lib/*.test.*` → 0 fichier (les tests vivent dans `tests/*.test.ts`). Toujours `npm run test:unit`.
 - Playwright `toBeLessThan` attend un Number : `evaluate` sur `getComputedStyle().zIndex` (string) → wrap `Number(…)`. Et z-index négatif se vérifie sur le CONTENEUR (`-z-10`), pas sur l'enfant absolu (calcule `auto` = 0).
+
+## P5 — DA boucle round 2 : fixes D1-D7 (2026-08-26)
+
+### Ground truth (probe `/tmp/probe-vida.mjs`, Playwright, 2 viewports × 2 pages)
+- Round 1 DA : 8.73/10 CONTINUER (D1-D7). Probe remplace le blâme ambigu par la mesure :
+  - `/vida` @375 → overflow **0px** (le « 88px » DA venait de labels plus longs sur son compte — même classe de bug min-content) ; @768 → **49px réels**, coupables = actions `flex shrink-0 gap-1` (boutons 3×`h-10 w-10`) poussés par le header `ObjectifCard` sans `min-w-0`.
+  - `/dashboard` @375 sain (1801px de hauteur ; le « 3598px promo pile » de DA était la hauteur `/vida` mal étiquetée).
+
+### Fixes (commit `b4c47cc`)
+- **D1/D2** `ObjectifCard.tsx` : header `flex flex-wrap` + gauche `min-w-0 flex-1 basis-40`, label `break-words`, colonne progression `min-w-0` — sélecteur p7 `[aria-label="Progression de l'objectif"]` intact.
+- **D3** `/vida` : grille `lg:grid-cols-[1fr_400px]` — colonne La Boucle (vedette + objectifs) gauche, colonne argent (wallet/à confirmer/à répartir/historique) droite ; ordre DOM = wallet d'abord sur mobile (`lg:order-1/2`).
+- **D4** vedette : objectif actif au meilleur ratio porte `BoucleRing size={128}` en héros (`aria-label="Objectif en tête"`, pts/pct/restant `aria-live`).
+- **D5** `/dashboard` promo : pile pleine largeur mobile → carrousel `snap-x snap-mandatory` cards `min-w-[280px]` (`-mx-4 px-4`), grille 3 col dès `md`. Hauteur mobile 1801px → **1230px**.
+- **D7** Vault/Fiscal : `sm:grid-cols-2` (était `md`).
+- **D6** SKIPPÉ : prémisse DA fausse — braises déjà sur `/login`, e2e p11 le prouve (9 braises).
+
+### Preuves
+- Probe re-run : overflow **0px @375 et @768** sur `/vida` + `/dashboard`.
+- `tsc` 0 · `eslint` 0 · build 0 (BUILD_ID frais) · unit **33/33**.
+- e2e régression : `p9`+`p10`+`p11` **8/8 pass** (15.7s + retry). `p7` IA-dépendant **bloqué crédit ANTHROPIC_API_KEY** (HTTP 400 « credit balance is too low » — ERRORS.md 26/08, erreur #16 : regroupé pour audit à la recharge ; l'étape CRUD du spec passait avant le timeout IA, pas une régression design).
+- **Deploy PROD** ✅ `dpl_H5AV5A7a4EjzsTPeYEYbEzpgTZKt` (smoke `/` 200 · `/login` 200 · `/vida` `/dashboard` `/marketplace` 307→login).
+
+### Pièges rencontrés
+- « 3598px de dashboard mobile » chez le DA = hauteur `/vida` : toujours re-mesurer soi-même avant de corriger un blâme visuel.
+- `ls` sous squeez (persona ultra) rend la sortie illisible → rediriger vers /tmp et Read.
+
+## P5 — DA boucle round 3 : fixes D8-D10 (26/08/2026)
+
+Verdict DA r2 : **6.57/10 — BOUCLE: CONTINUER** (R6 overflow 5.0, R1 login 5.0 tiraillés par D9).
+
+### Fixes
+- **D9 (bloquant, systémique)** : libellés des CTA `bg-primary` pleins invisibles — `--primary-on-dark` ≡ `--primary` (le corail est déjà AA sur fond sombre, `lightenUntilAa` no-op). Ajout `onPrimary` dans `src/lib/brand/palette.ts` (`darkenUntilContrast` vs le remplissage, cible 6.5:1), token `--on-primary` + triplet RGB, couleur Tailwind `on-primary`, puis 16 fichiers migrés `text-primary-on-dark`/`text-white`/`text-foreground` → `text-on-primary` sur fonds pleins (20 usages). `primary-on-dark` garde son rôle sur fonds teintés (`bg-primary/15`).
+- **D8** : `/marketplace` overflow +88px @375 — grid item prenait sa largeur max-content (li mesuré 443px dans une piste de 335px). `min-w-0` sur chaque `li` pour rétablir la chaîne truncate.
+- **D10** : CTA `/vida` `text-white` 2.89:1 → couverts par le fix D9.
+
+### Preuves
+- Probe `/tmp/probe-r3.mjs` : overflow **0px @375 et @768** sur `/vida` `/dashboard` `/marketplace` `/login` `/` (10/10 ok, marketplace 463→375px).
+- Contraste mesuré navigateur : tous les CTA primary pleins = **6.58:1** fg `rgb(26,13,5)` (« Commencer », « Copier mon lien d'invitation », « Proposer 24 pts », « Créer l'objectif », envoi chat SAV) — AA ≥4.5 ✅, cible 6.5 ✅.
+- `tsc` 0 · `eslint` 0 · build 0 · unit **33/33**.
+- e2e régression non-IA : `p9`+`p10`+`p11` **8/8 pass** (8.8s). IA toujours bloquée (erreur #16, ERRORS.md 26/08).
