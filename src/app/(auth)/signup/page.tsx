@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
 
 import AuthShell from '@/components/auth/AuthShell';
 import {
@@ -12,15 +13,32 @@ import {
   SubmitButton,
 } from '@/components/auth/AuthFields';
 import { createClient } from '@/lib/supabase';
+import { REFERRAL_STORAGE_KEY } from '@/lib/referral';
 
-export default function SignupPage() {
+function SignupForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [viaReferral, setViaReferral] = useState(false);
   const supabase = createClient();
+  const searchParams = useSearchParams();
+
+  // Parrainage : le lien d'invitation survit à la confirmation email et à
+  // l'OAuth Google (redirections) via sessionStorage — le dashboard consomme.
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref && ref.length >= 4 && ref.length <= 12) {
+      try {
+        sessionStorage.setItem(REFERRAL_STORAGE_KEY, ref.toUpperCase());
+        setViaReferral(true);
+      } catch {
+        // Navigation privée stricte : sans stockage, la saisie manuelle reste possible
+      }
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -83,6 +101,12 @@ export default function SignupPage() {
       subtitle="Vends ce qui t’encombre, Vida encaisse pour tes objectifs."
     >
       {error && <ErrorBanner message={error} />}
+      {viaReferral && !error && (
+        <p className="rounded-md border border-border-control bg-surface-raised px-4 py-3 text-sm text-foreground-secondary">
+          Invitation de parrain détectée — ton parrain sera lié à ton compte à
+          la première connexion.
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <EmailField value={email} onChange={setEmail} disabled={loading} />
         <PasswordField
@@ -110,5 +134,13 @@ export default function SignupPage() {
         </Link>
       </p>
     </AuthShell>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   );
 }

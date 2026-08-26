@@ -126,3 +126,20 @@ FINAL : `completed \| released` + commission 450 / net 4050 (ordre test 4500). N
 ### Qualité
 - `tsc --noEmit` exit=0 · `next build` 0 · unit 28/28 · e2e p8 1/1.
 - Piège rencontré : `toLocaleString('fr-FR')` sépare les milliers par une espace insécable (U+00A0) — les assertions unit comparent sans séparateurs, l'e2e génère la même chaîne côté Node (byte-à-byte OK).
+## P3 — EX-K2 Universels + Parrainage V4 ✅ (2026-08-26)
+
+### Implémentation
+- **4 blocs above the fold** (`/dashboard`, EX-K2) : Parrainage (code `TY-XXXXXX` + lien copiable), Ambassadeur (compteur filleuls, statut à vie), Écosystème PURAMA (cross-promo VIDA + KASH, code WELCOME50 copiable), solde Vida Vault. Objets + fiscal sous la ligne.
+- **Codes parrain** : `profiles.referral_code` généré par trigger (`'TY-' || upper(substr(md5(id),1,6))`, backfill 4 profils) + RPC `ensure_referral_code()` idempotent appelé au rendu dashboard si absent.
+- **Capture** : `/signup?ref=…` → `sessionStorage['tyaga_ref']` (survit confirmation email + OAuth Google) → bannière « Invitation de parrain détectée » → `ReferralAttach` (dashboard) POST `/api/referral/attach` → RPC `attach_referral` SECURITY DEFINER (`ok|invalid|self|already`) → clé levée + `router.refresh()`.
+- **N1 (§9.2)** : `payReferralN1` dans `finalizeCompletedSale` après crédit vendeur — 50% de la commission (`Math.round(cents/200)`) en points Vault au parrain, flag `commission_paid` = jamais 2×, try/catch jamais bloquant pour la vente.
+
+### Preuves
+- Unit `tests/referral.test.ts` **5 tests** : n1 (200c→1, arrondi, 0 négatif), normalizeCode, referralLink, pattern `TY-[A-F0-9]{6}`. Total **33/33**.
+- e2e `e2e/p9-universels.spec.ts` **2/2 (15.1s)** :
+  1. EX-K2 — 4 headings + code regex + boutons copier + liens `https://vida.purama.dev` / `https://kash.purama.dev` + WELCOME50.
+  2. Parrainage V4 — reset déterministe → code vendeur lu dashboard → login filleul (purge session : `clearCookies`+storages, sinon middleware redirect) → `sessionStorage` + reload → `expect.poll` SQL : ligne `referrals` (referrer=seller, code exact) → dashboard vendeur « 1 filleul » exact → garde self : propre code rejoué → 0 ligne self.
+- `tsc --noEmit` exit=0.
+
+### Piège rencontré
+- Re-login même contexte Playwright : session active → middleware `/login`→`/dashboard` → `input[type="email"]` jamais rendu (timeout 60s). Fix : helper `logout` (`clearCookies` + `localStorage.clear` + `sessionStorage.clear`) avant chaque changement d'utilisateur.

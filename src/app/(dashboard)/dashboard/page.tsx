@@ -1,13 +1,20 @@
 import { Camera } from 'lucide-react';
 import Link from 'next/link';
 
+import AmbassadorCard from '@/components/dashboard/AmbassadorCard';
+import CrossPromoCard from '@/components/dashboard/CrossPromoCard';
 import FiscalCounter from '@/components/dashboard/FiscalCounter';
+import ReferralAttach from '@/components/dashboard/ReferralAttach';
+import ReferralCard from '@/components/dashboard/ReferralCard';
+import VaultCard from '@/components/dashboard/VaultCard';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { fiscalSummary } from '@/lib/fiscal';
 import { formatDate } from '@/lib/utils';
 
 /**
- * Accueil : état réel du compte (profil + compteur annonces + revenus EX-J7).
+ * EX-K2 — accueil : 3 blocs universels above the fold (parrainage,
+ * ambassadeur, cross-promo VIDA/KASH WELCOME50), puis objets + solde Vault
+ * + compteur fiscal EX-J7. Tous les chiffres viennent de la DB (0 si 0).
  */
 export default async function DashboardPage() {
   const supabase = await createServerSupabaseClient();
@@ -15,24 +22,47 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: itemCountRows }, { data: ventesRows }] =
-    await Promise.all([
-      supabase
-        .from('profiles')
-        .select('full_name, created_at')
-        .eq('id', user!.id)
-        .single(),
-      supabase
-        .from('items')
-        .select('id')
-        .eq('user_id', user!.id)
-        .neq('status', 'draft'),
-      supabase
-        .from('ventes')
-        .select('net_amount_cents, fiscal_year')
-        .eq('seller_id', user!.id),
-    ]);
+  const [
+    { data: profile },
+    { data: itemCountRows },
+    { data: ventesRows },
+    { data: wallet },
+    { data: filleulRows },
+  ] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('full_name, created_at, referral_code')
+      .eq('id', user!.id)
+      .single(),
+    supabase
+      .from('items')
+      .select('id')
+      .eq('user_id', user!.id)
+      .neq('status', 'draft'),
+    supabase
+      .from('ventes')
+      .select('net_amount_cents, fiscal_year')
+      .eq('seller_id', user!.id),
+    supabase
+      .from('vida_wallet')
+      .select('balance_points')
+      .eq('user_id', user!.id)
+      .maybeSingle(),
+    supabase
+      .from('referrals')
+      .select('id')
+      .eq('referrer_id', user!.id),
+  ]);
   const itemCount = itemCountRows?.length ?? 0;
+  const filleuls = filleulRows?.length ?? 0;
+  const balance = wallet?.balance_points ?? 0;
+
+  // Ceinture et bretelles : backfill DDL + trigger + RPC couvrent tout profil
+  let referralCode = profile?.referral_code ?? null;
+  if (!referralCode) {
+    const { data: ensured } = await supabase.rpc('ensure_referral_code');
+    referralCode = ensured ?? null;
+  }
 
   const firstName =
     profile?.full_name?.split(' ')[0] || user!.email?.split('@')[0] || 'toi';
@@ -41,7 +71,7 @@ export default async function DashboardPage() {
   const fiscal = fiscalSummary(ventesRows ?? [], new Date().getFullYear());
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+    <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <div>
         <h1 className="font-display text-3xl">Bonjour {firstName}</h1>
         <p className="mt-2 text-sm text-foreground-muted">
@@ -51,6 +81,18 @@ export default async function DashboardPage() {
             : formatDate(user!.created_at ?? new Date())}
           .
         </p>
+      </div>
+
+      {/* Parrainage V4 — consomme /signup?ref=… au premier passage */}
+      <ReferralAttach />
+
+      {/* EX-K2 — 3 blocs universels above the fold */}
+      <div className="grid items-start gap-6 md:grid-cols-3">
+        {referralCode && (
+          <ReferralCard code={referralCode} filleuls={filleuls} />
+        )}
+        {referralCode && <AmbassadorCard filleuls={filleuls} />}
+        <CrossPromoCard />
       </div>
 
       {/* Compteur réel DB — 0 si 0 (jamais de chiffre inventé) */}
@@ -83,8 +125,11 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* EX-J7 — revenus annuels nets + alerte 250 € */}
-      <FiscalCounter summary={fiscal} />
+      {/* Solde Vault + EX-J7 revenus annuels nets + alerte 250 € */}
+      <div className="grid items-start gap-6 md:grid-cols-2">
+        <VaultCard balance={balance} />
+        <FiscalCounter summary={fiscal} />
+      </div>
     </div>
   );
 }

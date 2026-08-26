@@ -8,6 +8,7 @@ import {
   type OrderStatus,
 } from '@/lib/order-transitions';
 import { rateLimit } from '@/lib/rate-limit';
+import { payReferralN1 } from '@/lib/referral';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
@@ -155,6 +156,13 @@ async function finalizeCompletedSale(
     const points = pointsFromNet(order.net_amount_cents);
     if (points > 0) {
       await service.rpc('credit_wallet', { p_user: sellerId, p_points: points });
+    }
+    // Parrainage V4 N1 : 50 % de la commission au parrain si le vendeur est
+    // un filleul à sa première vente complétée — jamais bloquant pour la vente.
+    try {
+      await payReferralN1(service, sellerId, order.commission_amount_cents);
+    } catch {
+      // Crédit parrain reporté ; flag `commission_paid` garantit l'absence de double paie
     }
   }
 
