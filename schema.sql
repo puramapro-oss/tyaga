@@ -534,6 +534,10 @@ DECLARE
   v_objectif_ok boolean;
 BEGIN
   IF v_user IS NULL THEN RETURN 0; END IF;
+  -- Gel colonne (P6 S3/S4) : les écrits wallet/objectifs/transfers suivent
+  -- un chemin client authentifié → bypass explicite via GUC non exposée
+  -- (set_config est dans pg_catalog, hors schémas exposés à PostgREST).
+  PERFORM set_config('app.tyaga_srv', 'on', true);
   SELECT * INTO v_tr FROM tyaga.vida_transfers
    WHERE id = p_transfer AND user_id = v_user AND status = 'proposed'
    FOR UPDATE;
@@ -589,8 +593,10 @@ BEGIN
 
   DELETE FROM tyaga.ventes WHERE order_id = p_order;
 
+  -- Jury bugs P6 : v_net est en CENTIMES, le wallet en POINTS (1 pt = 1 € net,
+  -- cf pointsFromNet) — division entière = floor, symétrique du crédit.
   UPDATE tyaga.vida_wallet
-     SET balance_points = GREATEST(balance_points - v_net, 0), updated_at = now()
+     SET balance_points = GREATEST(balance_points - (v_net / 100), 0), updated_at = now()
    WHERE user_id = v_seller;
   RETURN 1;
 END $$;
@@ -648,3 +654,124 @@ END $$;
 
 REVOKE ALL ON FUNCTION tyaga.attach_referral(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION tyaga.attach_referral(text) TO authenticated;
+
+-- ============ P6 SÉCURITÉ — gel colonne par trigger (2026-08-26) ============
+-- RLS est ROW-level, pas column-level : ces BEFORE UPDATE gèlent les colonnes
+-- sensibles quand l'écrit vient d'un client authentifié (auth.uid() non-null).
+-- Le rôle service n'a pas de claim sub → auth.uid() NULL → trigger inactif.
+-- Les fonctions SECURITY DEFINER appelées par un client authentifié posent
+-- app.tyaga_srv='on' (GUC pg_catalog, non exposée à PostgREST) pour bypasser.
+
+-- S1 (CRITIQUE) — ordres : argent, parties et preuves Stripe intouchables côté client
+CREATE OR REPLACE FUNCTION tyaga.tg_orders_freeze()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL
+     AND current_setting('app.tyaga_srv', true) IS DISTINCT FROM 'on'
+     AND (
+       OLD.buyer_id               IS DISTINCT FROM NEW.buyer_id
+       OR OLD.seller_id            IS DISTINCT FROM NEW.seller_id
+       OR OLD.annonce_id           IS DISTINCT FROM NEW.annonce_id
+       OR OLD.amount_cents         IS DISTINCT FROM NEW.amount_cents
+       OR OLD.commission_pct       IS DISTINCT FROM NEW.commission_pct
+       OR OLD.commission_amount_cents IS DISTINCT FROM NEW.commission_amount_cents
+       OR OLD.net_amount_cents     IS DISTINCT FROM NEW.net_amount_cents
+       OR OLD.escrow_status        IS DISTINCT FROM NEW.escrow_status
+       OR OLD.shipping_address     IS DISTINCT FROM NEW.shipping_address
+       OR OLD.stripe_payment_intent_id  IS DISTINCT FROM NEW.stripe_payment_intent_id
+       OR OLD.stripe_checkout_session_id IS DISTINCT FROM NEW.stripe_checkout_session_id
+       OR OLD.stripe_transfer_id   IS DISTINCT FROM NEW.stripe_transfer_id
+       OR OLD.created_at           IS DISTINCT FROM NEW.created_at
+     ) THEN
+    RAISE EXCEPTION 'Colonnes financières non modifiables depuis l''app.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_orders_freeze ON tyaga.marketplace_orders;
+CREATE TRIGGER trg_orders_freeze
+BEFORE UPDATE ON tyaga.marketplace_orders
+FOR EACH ROW EXECUTE FUNCTION tyaga.tg_orders_freeze();
+
+-- S2 (HIGH) — profils : pas d'auto-élévation super-admin ni de détournement
+-- Stripe ; referral_code attribué une seule fois (NULL → valeur, jamais écrasé)
+CREATE OR REPLACE FUNCTION tyaga.tg_profiles_freeze()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL
+     AND current_setting('app.tyaga_srv', true) IS DISTINCT FROM 'on'
+     AND (
+       OLD.is_super_admin              IS DISTINCT FROM NEW.is_super_admin
+       OR OLD.stripe_customer_id       IS DISTINCT FROM NEW.stripe_customer_id
+       OR OLD.stripe_connect_account_id IS DISTINCT FROM NEW.stripe_connect_account_id
+       OR OLD.created_at               IS DISTINCT FROM NEW.created_at
+       OR (NEW.referral_code IS DISTINCT FROM OLD.referral_code
+           AND NOT (OLD.referral_code IS NULL AND NEW.referral_code IS NOT NULL))
+     ) THEN
+    RAISE EXCEPTION 'Champ de profil protégé.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_profiles_freeze ON tyaga.profiles;
+CREATE TRIGGER trg_profiles_freeze
+BEFORE UPDATE ON tyaga.profiles
+FOR EACH ROW EXECUTE FUNCTION tyaga.tg_profiles_freeze();
+
+-- S3 — transferts Vida : montant/destination gelés ; côté client seul
+-- proposed→cancelled est légal (confirm = serveur uniquement, via GUC)
+CREATE OR REPLACE FUNCTION tyaga.tg_transfers_freeze()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL
+     AND current_setting('app.tyaga_srv', true) IS DISTINCT FROM 'on'
+     AND (
+       OLD.user_id       IS DISTINCT FROM NEW.user_id
+       OR OLD.vente_id   IS DISTINCT FROM NEW.vente_id
+       OR OLD.objectif_id IS DISTINCT FROM NEW.objectif_id
+       OR OLD.pct        IS DISTINCT FROM NEW.pct
+       OR OLD.points_amount IS DISTINCT FROM NEW.points_amount
+       OR OLD.created_at IS DISTINCT FROM NEW.created_at
+       OR OLD.confirmed_at IS DISTINCT FROM NEW.confirmed_at
+       OR OLD.status     IS DISTINCT FROM NEW.status AND NOT (
+            OLD.status = 'proposed' AND NEW.status = 'cancelled')
+     ) THEN
+    RAISE EXCEPTION 'Transfert verrouillé — annulation seule possible côté app.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_transfers_freeze ON tyaga.vida_transfers;
+CREATE TRIGGER trg_transfers_freeze
+BEFORE UPDATE ON tyaga.vida_transfers
+FOR EACH ROW EXECUTE FUNCTION tyaga.tg_transfers_freeze();
+
+-- S4 — objectifs Vida : le compteur current_points n'avance que côté serveur
+CREATE OR REPLACE FUNCTION tyaga.tg_objectifs_freeze()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL
+     AND current_setting('app.tyaga_srv', true) IS DISTINCT FROM 'on'
+     AND (
+       OLD.user_id        IS DISTINCT FROM NEW.user_id
+       OR OLD.created_at  IS DISTINCT FROM NEW.created_at
+       OR OLD.current_points IS DISTINCT FROM NEW.current_points
+     ) THEN
+    RAISE EXCEPTION 'Progression d''objectif gérée par TYAGA uniquement.'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_objectifs_freeze ON tyaga.vida_objectifs;
+CREATE TRIGGER trg_objectifs_freeze
+BEFORE UPDATE ON tyaga.vida_objectifs
+FOR EACH ROW EXECUTE FUNCTION tyaga.tg_objectifs_freeze();
+
+-- S5 — course POST/POST : une seule proposition active par vente (23505 → 409)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transfers_vente_active
+  ON tyaga.vida_transfers(vente_id)
+  WHERE vente_id IS NOT NULL AND status <> 'cancelled';

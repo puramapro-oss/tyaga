@@ -139,7 +139,15 @@ export async function POST(request: Request) {
     .select('id, pct, points_amount, objectif_id, status')
     .single();
 
-  if (insertError || !transfer) {
+  if (insertError?.code === '23505' || !transfer) {
+    // idx_transfers_vente_active : la pré-validation ci-dessus a été doublée
+    // par une insertion concurrente (fenêtre TOCTOU fermée par l'index partiel).
+    return NextResponse.json(
+      { error: 'Cette vente a déjà une proposition de transfert.' },
+      { status: 409 }
+    );
+  }
+  if (insertError) {
     return NextResponse.json(
       { error: 'Proposition impossible. Réessaie dans un instant.' },
       { status: 500 }

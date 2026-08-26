@@ -44,7 +44,9 @@ export default function ReferralCard({
           <Users size={18} />
           Parrainage
         </h2>
-        <span className="rounded-pill bg-primary/20 px-3 py-1 text-xs font-medium text-primary-on-dark">
+        {/* Pixel P6 : fond plein — le badge translucide (primary/20) tombait
+            à 3,27:1 sur le glass, sous le seuil WCAG 4,5:1. */}
+        <span className="rounded-pill bg-primary px-3 py-1 text-xs font-medium text-on-primary">
           {filleuls} filleul{filleuls > 1 ? 's' : ''}
         </span>
       </div>
@@ -52,12 +54,14 @@ export default function ReferralCard({
       <div>
         <p className="text-sm text-foreground-muted">Ton code</p>
         <div className="mt-1 flex items-center gap-3">
-          <p className="font-mono text-2xl tracking-wider">{code}</p>
+          <p className="min-w-0 truncate font-mono text-2xl tracking-wider">{code}</p>
+          {/* Pixel P6 : shrink-0 — le flex réduisait le bouton copier à 17px
+              de large @768, sous la zone tactile 44px. */}
           <button
             type="button"
             onClick={() => copy('code')}
             aria-label="Copier mon code de parrainage"
-            className="flex h-11 w-11 items-center justify-center rounded-pill border border-border transition-colors hover:border-primary/40"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-pill border border-border transition-colors hover:border-primary/40"
           >
             {copied === 'code' ? (
               <Check size={15} className="text-primary-on-dark" />

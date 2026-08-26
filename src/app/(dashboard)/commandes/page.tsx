@@ -101,9 +101,11 @@ export default async function CommandesPage({
           {rows.map((o) => (
             <li key={o.id} className="glass flex flex-col gap-3 p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
+                {/* Pixel P6 : inline-flex min-h-11 — le lien titre ne faisait
+                    que ~24px de haut, sous la zone tactile 44px. */}
                 <Link
                   href={`/marketplace/${o.annonces?.id ?? ''}`}
-                  className="font-medium hover:text-primary"
+                  className="inline-flex min-h-11 items-center font-medium hover:text-primary"
                 >
                   {o.annonces?.title ?? 'Annonce retirée'}
                 </Link>

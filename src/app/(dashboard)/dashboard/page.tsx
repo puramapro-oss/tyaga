@@ -8,7 +8,7 @@ import ReferralAttach from '@/components/dashboard/ReferralAttach';
 import ReferralCard from '@/components/dashboard/ReferralCard';
 import VaultCard from '@/components/dashboard/VaultCard';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { fiscalSummary } from '@/lib/fiscal';
+import { fiscalSummary, fiscalYearParis } from '@/lib/fiscal';
 import { formatDate } from '@/lib/utils';
 
 /**
@@ -73,8 +73,10 @@ export default async function DashboardPage() {
   const firstName =
     profile?.full_name?.split(' ')[0] || user!.email?.split('@')[0] || 'toi';
 
-  // EX-J7 — compteur fiscal : cumul nets de l'année en cours (D14 : requête)
-  const fiscal = fiscalSummary(ventesRows ?? [], new Date().getFullYear());
+  // EX-J7 — compteur fiscal : cumul nets de l'année en cours (D14 : requête).
+  // fiscalYearParis : getFullYear() est UTC, une vente du 1ᵉʳ janvier 0 h–1 h
+  // UTC serait comptée sur N-1.
+  const fiscal = fiscalSummary(ventesRows ?? [], fiscalYearParis(new Date()));
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">

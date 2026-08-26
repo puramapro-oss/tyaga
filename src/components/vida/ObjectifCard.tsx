@@ -136,7 +136,7 @@ export default function ObjectifCard({ objectif }: { objectif: ObjectifRow }) {
               type="button"
               aria-label="Modifier l’objectif"
               onClick={() => setEditing(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-md border border-border text-foreground-muted hover:text-foreground"
+              className="flex h-11 w-11 items-center justify-center rounded-md border border-border text-foreground-muted hover:text-foreground"
             >
               <Pencil size={16} />
             </button>
@@ -145,7 +145,7 @@ export default function ObjectifCard({ objectif }: { objectif: ObjectifRow }) {
               aria-label={objectif.active ? 'Archiver l’objectif' : 'Réactiver l’objectif'}
               disabled={busy}
               onClick={() => call('PATCH', { active: !objectif.active })}
-              className="flex h-10 w-10 items-center justify-center rounded-md border border-border text-foreground-muted hover:text-foreground disabled:opacity-50"
+              className="flex h-11 w-11 items-center justify-center rounded-md border border-border text-foreground-muted hover:text-foreground disabled:opacity-50"
             >
               {objectif.active ? <Archive size={16} /> : <ArchiveRestore size={16} />}
             </button>
@@ -161,10 +161,10 @@ export default function ObjectifCard({ objectif }: { objectif: ObjectifRow }) {
                 }
               }}
               onBlur={() => setConfirmDelete(false)}
-              className={`flex h-10 items-center justify-center rounded-md border text-sm ${
+              className={`flex h-11 items-center justify-center rounded-md border text-sm ${
                 confirmDelete
                   ? 'w-auto gap-1 border-red-500/60 px-3 text-red-400'
-                  : 'w-10 border-border text-foreground-muted hover:text-foreground'
+                  : 'w-11 border-border text-foreground-muted hover:text-foreground'
               } disabled:opacity-50`}
             >
               <Trash2 size={16} />

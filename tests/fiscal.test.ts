@@ -67,10 +67,13 @@ test('seuil constant 25 000 cents', () => {
   assert.equal(FISCAL_ALERT_THRESHOLD_CENTS, 25_000);
 });
 
-test('formatEuros arrondit et formate en français', () => {
+test('formatEuros tronque (floor) et formate en français', () => {
   // toLocaleString('fr-FR') insère une espace insécable (U+00A0/U+202F) — on compare sans séparateurs
   const compact = (s: string) => s.replace(/[\s  ]/g, '');
   assert.equal(compact(formatEuros(0)), '0€');
   assert.equal(compact(formatEuros(25_000)), '250€');
-  assert.equal(compact(formatEuros(123_450)), '1235€'); // Math.round(1234.5) = 1235
+  // floor, pas round : l'affichage ne doit JAMAIS précéder le seuil d'alerte
+  // (24 999 c → « 249 € » alors que l'alerte 250 € n'est pas encore atteinte).
+  assert.equal(compact(formatEuros(24_999)), '249€');
+  assert.equal(compact(formatEuros(123_450)), '1234€'); // floor(1234.5) = 1234
 });

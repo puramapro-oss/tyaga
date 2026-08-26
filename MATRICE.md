@@ -97,7 +97,7 @@
 | J2 erreurs FR + solution | e2e p10:105 (401 « Connecte-toi » réel) ; messages 503/429 SupportChat implémentés FR mais non couverts e2e | PREUVES P4 (401) ; 503/429 = implémentés, pas testés | ✅ (401 prouvé) |
 | J3 loading+error+empty chaque vue | inspecteur-utilisateur jury (P6) | P6 ⏳ | ⏳ |
 | J4 IA s'appelle TYAGA | grep -ri 'claude' src/ → 6 hits serveur seulement (imports/models/commentaire), 0 .tsx, `model_used` jamais rendu | ✅ 26/08 |
-| J5 RLS 100% tables | matrice RLS 13/13 orders + jury-securite toutes tables (P6) | PREUVES P2.3 partiel | ⏳ P6 |
+| J5 RLS 100% tables + colonnes sensibles | RLS ligne 13/13 tables (P2.3) + triggers freeze colonnes prouvés VPS 7/7 (A1-A6 BLOCKED, service PASSES, reverse_sale floor -49 pts) | PREUVES P6 correcteur 2/2 (/tmp/verify-out.txt + /tmp/v65.txt, 26/08) | ✅ 26/08 |
 | J6 rate limit + Zod + try/catch toutes API | jury-securite (P6) ; SupportChat rate 20/h/user → 429 FR (PREUVES P4 aide) | P6 ⏳ partiel | ⏳ |
 | J7 fiscal compteur + alerte 250€ | unit 6 + e2e `p8-fiscal.spec.ts` bannière frontière | PREUVES P2.7 | ✅ |
 | J8 0 placeholder/TODO/console.log/any, 0 faux chiffres | jury-bugs + inspecteur-juridique (P6) | P6 ⏳ | ⏳ |
@@ -112,8 +112,8 @@
 
 ## Bilan
 
-- ✅ prouvé : 44/52
-- ⏳ P6 (en cours) : 6 — C5, I6 (DA r4 → VERT 9.36, reste boucle formelle), J3, J5 (extension toutes tables), J6, J8 → portes par les juries P6
+- ✅ prouvé : 45/52
+- ⏳ P6 (en cours) : 5 — C5, I6 (DA r4 → VERT 9.36, reste boucle formelle), J3, J6 (Upstash V1.1 différé → DECISIONS), J8 → portes par les juries P6
 - 🔒 IA différée : 2 — B3, D1 (testés verts 25/08 avant épuisement crédit ; re-audit groupé à la recharge, erreur #16 CLAUDE.md)
 
-Dernière mise à jour : 2026-08-26 (queue P6 correcteur : J9+K1/K2 ajoutés, J6 citation corrigée, pages légales BUILD:0, CONFORMITE.md VERT).
+Dernière mise à jour : 2026-08-26 (correcteur 2/2 : J5 ✅ VPS 7/7 triggers freeze colonnes, bilan 45/52).

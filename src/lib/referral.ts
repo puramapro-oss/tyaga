@@ -40,24 +40,32 @@ export async function payReferralN1(
   referredId: string,
   commissionCents: number
 ): Promise<number> {
-  const { data: referral, error } = await service
-    .from('referrals')
-    .select('id, referrer_id, commission_paid')
-    .eq('referred_id', referredId)
-    .eq('commission_paid', false)
-    .maybeSingle();
-  if (error || !referral) return 0;
-
-  const points = n1PointsFromCommission(commissionCents);
-  if (points > 0) {
-    await service.rpc('credit_wallet', {
-      p_user: referral.referrer_id,
-      p_points: points,
-    });
-  }
-  await service
+  // Jury bugs P6 : claim atomique AVANT le crédit — le flag posé conditionnel
+  // dans le même UPDATE ferme la fenêtre TOCTOU (deux finalisations
+  // concurrentes ne peuvent pas créditer le parrain deux fois).
+  const { data: claimed, error: claimError } = await service
     .from('referrals')
     .update({ commission_paid: true })
-    .eq('id', referral.id);
+    .eq('referred_id', referredId)
+    .eq('commission_paid', false)
+    .select('id, referrer_id')
+    .maybeSingle();
+  if (claimError || !claimed) return 0;
+
+  const points = n1PointsFromCommission(commissionCents);
+  if (points <= 0) return 0;
+  try {
+    await service.rpc('credit_wallet', {
+      p_user: claimed.referrer_id,
+      p_points: points,
+    });
+  } catch (e) {
+    // Crédit raté : on relâche le claim pour qu'un rejeu puisse repayer.
+    await service
+      .from('referrals')
+      .update({ commission_paid: false })
+      .eq('id', claimed.id);
+    throw e;
+  }
   return points;
 }

@@ -280,3 +280,23 @@ MATRICE.md créée (47 EX → test → preuve) : 41 ✅ / 4 ⏳ P6 juries / 2 �
 - **Juridique (inspecteur-juridique)** : `mentions-legales` + « Directeur de la publication : le représentant légal de la SASU PURAMA » (LCEN 6-III) ; CGV §8 + CGU §13 + ligne médiation de la consommation (art. L612-1 C. conso, formulation flotte rita). SIRET/SIREN + médiateur nommé = écarts business écosystème → CONFORMITE.md.
 - **I1 (jury-tests)** : exceptions hex documentées → DECISIONS D20 (logo Google AuthFields + satori OG).
 - **A2/J2** : citations MATRICE reformulées exactes (A2 = redirection automatisée + session manuelle ; J2 = 401 prouvé, 503/429 implémentés non testés).
+
+### P6 — Correcteur juries 2/2 : RLS colonnes + fixes code + pixel (26/08/2026)
+
+**Correcteur batch 2** (rapports jury-securite + jury-bugs + inspecteur-pixel). Tout prouvé VPS ou re-run gate.
+
+**1. CRITIQUE RLS colonne → triggers freeze (VPS, /tmp/verify-out.txt + /tmp/v65.txt)** :
+- `tg_orders_freeze` : A1 `amount_cents` BLOCKED · A6 `status→confirmed` BLOCKED · A3 `proposed→cancelled` (annulation légitime) PASSES
+- `tg_profiles_freeze` : A4 `current_points` BLOCKED · A5 `referral_code` overwrite BLOCKED
+- `tg_transfers_freeze` : A2 `amount_cents` BLOCKED
+- S : écriture service via `set_config('app.tyaga_srv','on',true)` PASSES (confirm_transfer 100→4950)
+- R : `reverse_sale` floor — net 4950 c, avant 108 pts, delta **-49 pts** (jamais négatif, `GREATEST(…,0)`)
+- Mécanique : triggers BEFORE UPDATE vérifient `auth.uid() IS NOT NULL` (client) → colonnes immuables ; JWT service sans `sub` + GUC → passe. 7/7.
+
+**2. Fixes code (9)** : orders stale-accept `acceptIdx < offerIdx` (fenêtre messages desc) · orders/transfers 23505→409 (vente active `idx_transfers_vente_active`) · finalize idempotent (UPDATE `.select('id').maybeSingle()`, re-read completed OK) · stripe-fulfillment slug `tyaga` fail-closed (charge.refunded metadata) · referral payReferralN1 claim-first + compensation revert · admin `annonce_id` (select vide corrigé) · scan sniffImageType magic bytes (JPEG/PNG/WebP, 400 sinon) · fiscal `Math.floor` (bornes 24 999→249 € / 123 450→1234 € testées) · profiles freeze (ci-dessus).
+
+**3. Pixel (7/7)** : mailto aide `link-action` 44px · ReferralCard copier `shrink-0` h-11 w-11 · badge parrain fond plein `bg-primary text-on-primary` (3,27→7,5:1) · ObjectifCard 3 boutons icône h-11 ×4 cartes · lien titre commandes `inline-flex min-h-11` · footers/aide globals `link-action` (déjà en place, vérifié). Zones ≥44px WCAG 2.5.5.
+
+**4. Gate locale** : `tsc --noEmit` 0 · `next lint` 0 · `next build` 0 (35 pages) · unit **37/37**.
+
+**5. e2e full run** (/tmp/e2e-b2.txt) : **2 pass** (p9-universels…) · **3 failed** p4:85 / p6:120 / p7:138 — même racine unique : « Générer l'annonce » → alert `La rédaction d'annonce est indisponible pour l'instant` (/tmp/ectx.txt) = crédit ANTHROPIC épuisé (erreur #16, déjà différé batch IA). AUCUN fichier batch 2 ne touche la génération d'annonce → non-régression. Couverture compensatoire : preuves DB 7/7 + unit 37/37 + build 0.

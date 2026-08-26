@@ -105,26 +105,33 @@ export async function POST(request: Request) {
     .eq('buyer_id', user.id)
     .maybeSingle();
   if (conv) {
+    // Jury bugs P6 : fenêtre du plus RÉCENT au plus ancien (desc), et l'accept
+    // vendeur ne vaut que s'il est plus récent que la dernière offre acheteur.
     const { data: msgs } = await supabase
       .from('inbox_messages')
       .select('sender_id, offer_cents')
       .eq('conversation_id', conv.id)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(50);
-    const latest = [...(msgs ?? [])].reverse();
-    const buyerOffer = latest.find((m) => m.sender_id === user.id && m.offer_cents !== null)
-      ?.offer_cents;
-    const sellerAccept = latest.find(
+    const desc = msgs ?? [];
+    const acceptIdx = desc.findIndex(
       (m) => m.sender_id === annonce.user_id && m.offer_cents !== null
-    )?.offer_cents;
-    if (
-      buyerOffer != null &&
-      sellerAccept != null &&
-      buyerOffer === sellerAccept &&
-      buyerOffer >= 100 &&
-      buyerOffer <= annonce.price_cents
-    ) {
-      priceCents = buyerOffer;
+    );
+    const offerIdx = desc.findIndex(
+      (m) => m.sender_id === user.id && m.offer_cents !== null
+    );
+    if (acceptIdx !== -1 && offerIdx !== -1 && acceptIdx < offerIdx) {
+      const buyerOffer = desc[offerIdx].offer_cents;
+      const sellerAccept = desc[acceptIdx].offer_cents;
+      if (
+        buyerOffer != null &&
+        sellerAccept != null &&
+        buyerOffer === sellerAccept &&
+        buyerOffer >= 100 &&
+        buyerOffer <= annonce.price_cents
+      ) {
+        priceCents = buyerOffer;
+      }
     }
   }
 

@@ -34,11 +34,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Signature invalide' }, { status: 400 });
   }
 
-  // Défense : karma ne doit nous envoyer que du tyaga
+  // Défense (jury bugs P6) : karma ne doit nous envoyer QUE du tyaga. Un event
+  // sans app_slug n'est pas à nous → acquitté ignoré, JAMAIS traité (fail-closed).
   const slug =
     (event.data.object as { metadata?: Record<string, string> }).metadata?.app_slug ?? null;
-  if (slug && slug !== 'tyaga') {
-    return NextResponse.json({ received: true, ignored: slug });
+  if (slug !== 'tyaga') {
+    return NextResponse.json({ received: true, ignored: slug ?? 'unknown' });
   }
 
   // EX-E4 : idempotence locale. Le marqueur est posé APRÈS le succès du

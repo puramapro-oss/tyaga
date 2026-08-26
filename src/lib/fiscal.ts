@@ -35,7 +35,10 @@ export function fiscalSummary(
 }
 
 export function formatEuros(cents: number): string {
-  return `${Math.round(cents / 100).toLocaleString('fr-FR')} €`;
+  // floor, pas round : 24 999 c affichait « 250 € » alors que l'alerte 250 €
+  // (>= 25 000 c) n'était pas encore atteinte — l'affichage ne doit jamais
+  // précéder le seuil.
+  return `${Math.floor(cents / 100).toLocaleString('fr-FR')} €`;
 }
 
 /**

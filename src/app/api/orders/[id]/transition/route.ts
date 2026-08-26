@@ -184,12 +184,27 @@ async function finalizeCompletedSale(orderId: string): Promise<void> {
   }
 
   const now = new Date().toISOString();
-  const { error: completeError } = await service
+  // Jury bugs P6 : sans .select, un UPDATE silencieux à 0 ligne (statut
+  // inattendu) laissait filer l'insert ventes → vente créditée sans commande
+  // completed. 0 ligne = OK uniquement si déjà completed (rejeu idempotent).
+  const { data: done, error: completeError } = await service
     .from('marketplace_orders')
     .update({ status: 'completed', escrow_status: 'released', updated_at: now })
     .eq('id', orderId)
-    .eq('status', 'delivered');
+    .eq('status', 'delivered')
+    .select('id')
+    .maybeSingle();
   if (completeError) throw new Error(`passage completed (${completeError.code})`);
+  if (!done) {
+    const { data: current } = await service
+      .from('marketplace_orders')
+      .select('status')
+      .eq('id', orderId)
+      .single();
+    if (current?.status !== 'completed') {
+      throw new Error('passage completed (statut inattendu)');
+    }
+  }
 
   // EX-E2 : ligne de vente tracée (commission + net). Unique sur order_id.
   const { error: venteError } = await service.from('ventes').insert({

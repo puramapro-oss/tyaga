@@ -74,7 +74,9 @@ export default async function AdminPage() {
     service
       .from('marketplace_orders')
       .select(
-        'id,listing_id,buyer_id,seller_id,amount_cents,commission_amount_cents,net_amount_cents,status,escrow_status,created_at'
+        // Jury bugs P6 : pas de listing_id — la colonne est annonce_id, une
+        // colonne inexistante fait échouer TOUTE la requête (table muette).
+        'id,annonce_id,buyer_id,seller_id,amount_cents,commission_amount_cents,net_amount_cents,status,escrow_status,created_at'
       )
       .order('created_at', { ascending: false })
       .limit(10),

@@ -61,10 +61,7 @@ export default function AidePage() {
           <h2 className="font-display text-lg">Besoin d’un humain ?</h2>
           <p className="mt-1 text-sm leading-relaxed text-foreground-muted">
             Écris à{' '}
-            <a
-              href="mailto:hello@tyaga.purama.dev"
-              className="font-medium text-foreground underline decoration-border underline-offset-4 hover:decoration-primary"
-            >
+            <a href="mailto:hello@tyaga.purama.dev" className="link-action font-medium">
               hello@tyaga.purama.dev
             </a>{' '}
             — réponse sous 48 h, du lundi au samedi.

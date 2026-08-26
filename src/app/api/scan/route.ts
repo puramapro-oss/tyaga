@@ -18,11 +18,38 @@ export const maxDuration = 60;
 
 const ANGLES = ['face', 'dos', 'defaut'] as const;
 const MAX_BYTES = 10 * 1024 * 1024;
-const MIME_EXT: Record<string, string> = {
+type SniffedImageType = 'image/jpeg' | 'image/png' | 'image/webp';
+
+const MIME_EXT: Record<SniffedImageType, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp',
 };
+
+/**
+ * Jury bugs P6 : le Content-Type déclaré par le client est une parole, pas un
+ * fait — on tranche sur les octets (magic bytes) avant d'exposer le fichier au
+ * storage ou à l'API vision.
+ */
+function sniffImageType(buf: Buffer): SniffedImageType | null {
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (
+    buf.length >= 8 &&
+    buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 &&
+    buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a
+  ) {
+    return 'image/png';
+  }
+  if (
+    buf.length >= 12 &&
+    buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return 'image/webp';
+  }
+  return null;
+}
 
 const saveSchema = z.object({
   itemId: z.string().uuid(),
@@ -78,20 +105,34 @@ export async function POST(request: Request) {
       files.push({ angle, file });
     }
 
-    for (const { file } of files) {
-      const ext = MIME_EXT[file.type];
-      if (!ext) {
-        return NextResponse.json(
-          { error: 'Format non supporté. Utilise JPG, PNG ou WebP.' },
-          { status: 400 }
-        );
-      }
+    // Octets lus UNE fois : la validation comme l'upload partagent le buffer.
+    const photos: {
+      angle: string;
+      buffer: Buffer;
+      type: SniffedImageType;
+      capturedAt: string;
+    }[] = [];
+    for (const { angle, file } of files) {
       if (file.size > MAX_BYTES) {
         return NextResponse.json(
           { error: 'Une photo dépasse 10 Mo. Compresse-la et réessaie.' },
           { status: 400 }
         );
       }
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const type = sniffImageType(buffer);
+      if (!type) {
+        return NextResponse.json(
+          { error: 'Format non supporté. Utilise JPG, PNG ou WebP.' },
+          { status: 400 }
+        );
+      }
+      photos.push({
+        angle,
+        buffer,
+        type,
+        capturedAt: new Date(file.lastModified || Date.now()).toISOString(),
+      });
     }
 
     // Item draft : les photos et preuves sont conservées même si l'IA échoue.
@@ -110,15 +151,14 @@ export async function POST(request: Request) {
     const service = createServiceClient();
     const visionPhotos: Parameters<typeof analyzePhotos>[0] = [];
 
-    for (const { angle, file } of files) {
-      const buffer = Buffer.from(await file.arrayBuffer());
+    for (const { angle, buffer, type, capturedAt } of photos) {
       const sha256 = createHash('sha256').update(buffer).digest('hex');
-      const ext = MIME_EXT[file.type];
+      const ext = MIME_EXT[type];
       const path = `${user.id}/${item.id}/${angle}.${ext}`;
 
       const { error: upError } = await service.storage
         .from('tyaga-photos')
-        .upload(path, buffer, { contentType: file.type, upsert: true });
+        .upload(path, buffer, { contentType: type, upsert: true });
       if (upError) {
         return NextResponse.json(
           {
@@ -136,7 +176,7 @@ export async function POST(request: Request) {
         angle,
         position: ANGLES.indexOf(angle as (typeof ANGLES)[number]),
         sha256,
-        captured_at: new Date(file.lastModified || Date.now()).toISOString(),
+        captured_at: capturedAt,
       });
       if (photoError) {
         return NextResponse.json(
@@ -147,7 +187,7 @@ export async function POST(request: Request) {
 
       visionPhotos.push({
         base64: buffer.toString('base64'),
-        mediaType: file.type as 'image/jpeg' | 'image/png' | 'image/webp',
+        mediaType: type,
       });
     }
 
