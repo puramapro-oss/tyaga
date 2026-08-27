@@ -34,3 +34,21 @@ yarn-error.log*
 .gitnexus/
 *.tsbuildinfo
 next-env.d.ts
+
+# Native (Capacitor P7) — régénérés en CI depuis capacitor.config.ts + resources/
+/ios
+/android
+
+# ── Docs internes — repo GitHub PUBLIC, stratégie/process restent locaux ────
+# (pattern flotte kaia ; l'historique local conserve les révisions antérieures)
+/TYAGA-BRIEF.md
+/CLAUDE.md
+/task_plan.md
+/progress.md
+/ERRORS.md
+/PATTERNS.md
+/AGENTS.md
+/KARMA_INTEGRATION.md
+/PURAMA_MASTER_UPGRADE.md
+/STATUS.md
+/.claude/

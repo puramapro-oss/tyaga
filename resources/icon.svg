@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- TYAGA — boucle de braise sur tuile gradient (TyagaMark, src/lib/og-logo.tsx).
+       Palette seed 'warmth-community-tyaga' : primary #dd804b → secondary #d9b958. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#dd804b"/>
+      <stop offset="100%" stop-color="#d9b958"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#g)"/>
+  <svg x="271.5" y="271.5" width="481" height="481" viewBox="0 0 24 24" fill="none">
+    <path d="M12 3c-4.5 0-8 3.4-8 7.8 0 4.4 3.5 8.2 8 8.2 3 0 5.6-1.6 7-4" stroke="#0a0a0f" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="19" cy="7" r="2.4" fill="#0a0a0f"/>
+  </svg>
+</svg>

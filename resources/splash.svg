@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2732" height="2732" viewBox="0 0 2732 2732">
+  <!-- TYAGA splash — mark corail #dd804b centré sur fond plateforme #0a0a0f. -->
+  <rect width="2732" height="2732" fill="#0a0a0f"/>
+  <svg x="1186" y="1186" width="360" height="360" viewBox="0 0 24 24" fill="none">
+    <path d="M12 3c-4.5 0-8 3.4-8 7.8 0 4.4 3.5 8.2 8 8.2 3 0 5.6-1.6 7-4" stroke="#dd804b" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="19" cy="7" r="2.4" fill="#dd804b"/>
+  </svg>
+</svg>
