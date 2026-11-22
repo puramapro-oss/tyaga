@@ -300,3 +300,116 @@ MATRICE.md créée (47 EX → test → preuve) : 41 ✅ / 4 ⏳ P6 juries / 2 �
 **4. Gate locale** : `tsc --noEmit` 0 · `next lint` 0 · `next build` 0 (35 pages) · unit **37/37**.
 
 **5. e2e full run** (/tmp/e2e-b2.txt) : **2 pass** (p9-universels…) · **3 failed** p4:85 / p6:120 / p7:138 — même racine unique : « Générer l'annonce » → alert `La rédaction d'annonce est indisponible pour l'instant` (/tmp/ectx.txt) = crédit ANTHROPIC épuisé (erreur #16, déjà différé batch IA). AUCUN fichier batch 2 ne touche la génération d'annonce → non-régression. Couverture compensatoire : preuves DB 7/7 + unit 37/37 + build 0.
+
+## 2026-11-22 — Règlements et remboursements : reprise durable (local)
+
+**Périmètre :** correctif repris sur `2f1e734c6b90d1e5e5dcbee3e1a88dd039c80669`,
+route de transitions, webhook financier, journal SQL, orchestrateurs et affichage
+commandes. La notice [sql/REGLEMENTS.md](sql/REGLEMENTS.md) décrit l'ordre des deux
+migrations, les reprises permises et les cas de revue.
+
+**Contre-exemples avant correction.** Le vrai finaliseur d'origine a produit
+2 virements pour 1 commande rejouée, puis 2 après une réponse Stripe perdue.
+Un crédit wallet appliqué suivi d'une réponse perdue et de la compensation
+ancienne a produit 180 points au lieu de 90. Ces 3 assertions échouaient sur la
+source d'origine. Une contre-revue a aussi exécuté l'ancien handler de
+remboursement : après un échec temporaire de `reverse_sale`, le rejeu sautait
+une commande déjà `cancelled/refunded` ; la vente et 90 points restaient présents.
+Les précédentes mentions d'idempotence dans ce document ne couvraient donc pas
+ces cas ; elles ne constituent pas une preuve de résistance à ces pannes.
+
+**Correction.** La comptabilité de finalisation est transactionnelle ; le droit
+d'émettre un virement est consommé une seule fois en base. Toute issue inconnue
+se reprend par lecture Stripe et comparaison du reçu, sans nouvel envoi. Les
+anciens historiques ambigus ne sont pas repayés. Le remboursement complet
+regroupe annulation, suppression de vente, débit wallet et marqueur dans une
+transaction ; sa réversion dispose de son propre claim durable. Un événement
+n'est pas acquitté tant que sa compensation reste inconnue. Les réponses plus
+anciennes ne peuvent effacer une preuve de réversion ou de remboursement.
+
+L'interface vérifie le reçu avant d'affirmer le versement ; une réversion
+rapprochée retire aussi un état libéré trompeur. Les actions de reprise sont
+accessibles pour une réception déjà enregistrée. Les réponses API contiennent
+l'état réellement obtenu, et non celui lu avant la finalisation.
+
+| Recette du lot financier | Preuve constatée |
+| --- | --- |
+| Unités du rapprochement et des libellés | **PASS — 24/24**, 0 échec, avec le code réel et Zod 4.6.7. |
+| `npm run test:settlement:sql` | **PASS — 62/62**, 0 échec, 0 test ignoré, code de sortie 0 ; exécution séquentielle, 98,7 s, terminée le 22/11/2026 à 04:30:21 UTC. |
+| Détail des 62 cas | 29 finalisation/SQL + 22 remboursement/webhook + 11 route/RLS. |
+| Source/runtime | Node 24.22.3, Next 15.5.29, PGlite 0.5.17 ; dépendances verrouillées du dépôt. |
+| Effets fournisseurs | Aucun appel Stripe réel, aucune session réelle, aucun email ni virement. |
+
+Les recettes exécutent les vrais handlers, les orchestrateurs et les migrations
+SQL. Les tables, la fonction de crédit, les règles RLS et les triggers utilisés
+par les fixtures sont repris du schéma existant. Le transport Supabase, la
+session et Stripe sont remplacés localement ; les objets HTTP Next sont réels.
+La signature Stripe est simulée dans la recette du webhook.
+
+Les 62 cas comprennent notamment les refus de rôle/statut/remboursement, la
+migration manquante, les historiques avec ou sans vente/reçu, le rollback d'un
+crédit N1, les réponses perdues avant/après commit, les reçus impossibles à
+persister, les erreurs de lecture, les paramètres figés, les reprises après 60 jours,
+les deux ordres d'arrivée de preuves de réversion, les remboursements partiels,
+le checkout avant/après le refund, le transfert tardif et les remboursements
+entrelacés. Le solde initial de 190 points vérifie un unique débit de 90 sans
+que le plancher zéro puisse masquer un double débit.
+
+**Qualification native complémentaire.** Les sockets Unix ne sont pas pris en
+charge par l'environnement de validation. Le même PostgreSQL 17.12 a ensuite
+été lancé uniquement sur `127.0.0.1`, avec une base de test jetable, puis arrêté.
+`npm run test:postgres-concurrency` : **PASS — 6/6**, aucun échec ni test ignoré.
+Huit connexions indépendantes ne consomment qu'un claim de virement puis un
+claim de réversion ; les reprises ne débitent qu'une fois. Une connexion de
+réception attend effectivement le verrou détenu par le remboursement, vérifié
+dans `pg_stat_activity`, avant une libération explicite de la transaction.
+Le reçu tardif conserve `cancelled/refunded`, la preuve complète ne régresse
+pas et le rôle authentifié ne peut pas invoquer les RPC de service.
+
+**Limites explicites.** PGlite reste une instance embarquée ; le résultat natif
+ci-dessus est une qualification séparée des fonctions et fixtures concernées,
+pas du schéma Supabase complet ni de sa configuration déployée.
+Aucune migration cible n'a été exécutée dans cette recette ;
+Stripe réel, la signature réelle, le déploiement et les parcours navigateur
+financiers restent **NON TESTÉS** par ce lot. Un remboursement partiel, une
+réversion partielle, un historique ambigu ou un droit consommé sans preuve
+nécessite une revue ; aucun prorata ni nouvel envoi automatique n'est inventé.
+Le dispatcher existant fournit les reprises, dans sa propre fenêtre de
+rétention. Un paiement jamais rattaché reste en échec à rapprocher.
+
+## 2026-11-22 — Authentification, dépendances et contrôles globaux
+
+Le callback refuse les destinations externes, y compris les antislashs et
+caractères de contrôle normalisés par le parseur URL. Il attend une session
+et un utilisateur confirmés, expose les erreurs de transport et ignore un
+échange terminé après démontage. StrictMode conserve un seul échange OAuth.
+
+| Contrôle réellement exécuté | Résultat |
+| --- | --- |
+| `npm run test:unit` | **PASS — 94/94** : les 37 cas préexistants, 29 redirections, 24 règlements/libellés et 4 tests des codecs natifs PNG/JPEG/WebP/AVIF. |
+| `npm run test:auth-callback` | **PASS — 11/11** sur le vrai composant React et ReactDOM, avec transport et routeur simulés. |
+| `npm run typecheck` | **PASS**, configuration complète du dépôt, code de sortie 0. |
+| `npm run lint` | **PASS**, aucune erreur ni avertissement de code, code de sortie 0. |
+| `npm run build` | **PASS**, Next 15.5.29, 35/35 pages statiques ; configuration de fournisseurs synthétique, aucun compte réel. |
+| `npm audit --package-lock-only` sur le registre public | **PASS**, 0 critique, 0 élevée, 0 modérée, 0 faible. L'état initial signalait 18 vulnérabilités : 3 critiques, 6 élevées et 9 modérées. |
+| Workflow Web | Syntaxe YAML/Bash et `actionlint` officiel 1.7.12 : **PASS**. Le résultat du runner doit être lu sur le commit publié ; il ne se déduit pas de cette validation locale. |
+
+Versions verrouillées principales : Next et eslint-config-next 15.5.29,
+Capacitor core/CLI/Android/iOS 7.6.10, Zod 4.6.7, Sharp 0.35.5,
+PostCSS 8.5.26, rimraf 6.1.4. Les trois dernières alertes de glob/minimatch
+ont été résolues par le correctif compatible du parent rimraf, sans forcer
+une API majeure sur un consommateur ancien. L'usage de Zod 4 est vérifié par
+les vraies routes, les suites SQL, le typage et la compilation. Le nouveau
+runtime d'images est exécuté par les tests de codecs, pas uniquement installé.
+
+La CI Web reprend les commandes maintenues avec Node 24.22.3 et un PostgreSQL
+17.12 isolé, épinglé par digest. Aucun port de base n'est publié par ce service.
+L'audit s'arrête avant envoi si une dépendance du lock ne provient pas du
+registre npm public. Les avertissements d'outillage Node/npm observés dans
+les journaux ne sont pas présentés comme des diagnostics applicatifs.
+
+Ce résultat d'audit porte sur les avis connus du registre lors de la recette.
+Il ne certifie pas l'absence de toute vulnérabilité. Les versions natives
+Capacitor corrigées nécessitent encore la construction, la recette et la
+distribution des applications ; aucun APK/IPA n'est certifié par ce build Web.
+La branche de revue est exclue des déploiements Vercel automatiques.

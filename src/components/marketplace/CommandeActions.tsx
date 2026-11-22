@@ -14,6 +14,7 @@ interface CommandeActionsProps {
   orderId: string;
   status: string;
   role: 'buyer' | 'seller';
+  settlementPending?: boolean;
 }
 
 const BUTTON_CLASS =
@@ -23,10 +24,12 @@ export default function CommandeActions({
   orderId,
   status,
   role,
+  settlementPending = false,
 }: CommandeActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const action =
     role === 'buyer' && status === 'pending'
@@ -37,6 +40,10 @@ export default function CommandeActions({
           ? { key: 'ship', label: 'Objet expédié' }
           : role === 'buyer' && status === 'shipped'
             ? { key: 'deliver', label: 'J’ai bien reçu l’objet' }
+            : role === 'buyer' && status === 'delivered'
+              ? { key: 'deliver', label: 'Finaliser la réception' }
+              : role === 'buyer' && status === 'completed' && settlementPending
+                ? { key: 'deliver', label: 'Vérifier le versement' }
             : null;
 
   if (!action) return null;
@@ -44,6 +51,7 @@ export default function CommandeActions({
   async function run() {
     if (loading) return;
     setError(null);
+    setNotice(null);
     setLoading(action!.key);
     try {
       const res = await fetch(`/api/orders/${orderId}/transition`, {
@@ -51,11 +59,18 @@ export default function CommandeActions({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: action!.key }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as {
+        error?: string; settlement?: { status: string };
+      };
       if (!res.ok) {
         setError(data.error ?? 'Action impossible.');
         setLoading(null);
         return;
+      }
+      if (data.settlement?.status === 'verification_required') {
+        setNotice('La réception est enregistrée. Le versement vendeur reste à vérifier.');
+      } else if (data.settlement?.status === 'awaiting_account') {
+        setNotice('La réception est enregistrée. Le vendeur doit connecter son compte de versement.');
       }
       router.refresh();
       setLoading(null);
@@ -76,6 +91,7 @@ export default function CommandeActions({
           {error}
         </p>
       )}
+      {notice && <p role="status" className="text-sm text-foreground-secondary">{notice}</p>}
     </div>
   );
 }

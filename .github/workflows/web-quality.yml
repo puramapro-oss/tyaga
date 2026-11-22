@@ -1,0 +1,96 @@
+name: Web quality
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  npm_config_audit: 'false'
+  npm_config_fund: 'false'
+  NEXT_TELEMETRY_DISABLED: '1'
+  NODE_OPTIONS: --max-old-space-size=3072
+
+jobs:
+  web-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17.12@sha256:223efeb196329b55b3b9a13db144956411dbc18e727e59f681c3e0aede6475cf
+        env:
+          POSTGRES_USER: tyaga_test_owner
+          POSTGRES_DB: tyaga_test_quality
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd "pg_isready -U tyaga_test_owner -d tyaga_test_quality"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out source without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Select the verified Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.3
+          cache: npm
+
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+
+      - name: Prepare dependencies without repository credentials
+        run: npm rebuild --no-audit --no-fund
+
+      - name: Run application unit tests
+        run: npm run test:unit
+
+      - name: Exercise the actual authentication callback
+        run: npm run test:auth-callback
+
+      - name: Exercise settlement SQL and API routes in an isolated database
+        run: npm run test:settlement:sql
+
+      - name: Verify concurrent claims with native PostgreSQL connections
+        env:
+          TYAGA_TEST_PG_CONTAINER: ${{ job.services.postgres.id }}
+          TYAGA_TEST_PG_DATABASE: tyaga_test_quality
+          TYAGA_TEST_PG_USER: tyaga_test_owner
+          TYAGA_TEST_PG_HOST: 127.0.0.1
+        run: npm run test:postgres-concurrency
+
+      - name: Check the complete TypeScript application
+        run: npm run typecheck
+
+      - name: Lint application sources
+        run: npm run lint
+
+      - name: Build with synthetic provider configuration
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:9
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: local-validation-no-service
+          SUPABASE_SERVICE_ROLE_KEY: local-validation-no-service
+        run: npm run build
+
+      - name: Audit only the public dependency graph
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          for (const [path, entry] of Object.entries(lock.packages)) {
+            if (path && !entry.resolved?.startsWith('https://registry.npmjs.org/')) {
+              throw new Error('Audit stopped: a dependency is outside the public npm registry');
+            }
+          }
+          NODE
+          npm audit --audit-level=high --registry=https://registry.npmjs.org --fetch-retries=0 --fetch-timeout=20000

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
+import { refundCompletedSale } from '@/lib/order-refund';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
 
@@ -53,7 +54,9 @@ export async function POST(request: Request) {
     .select('event_id')
     .eq('event_id', event.id)
     .maybeSingle();
-  if (existing) {
+  // Les anciens événements de remboursement ont pu être acquittés avant la
+  // compensation. Leur rejeu passe par le journal durable, même déjà marqué.
+  if (existing && event.type !== 'charge.refunded') {
     return NextResponse.json({ received: true, duplicate: true });
   }
 
@@ -127,13 +130,24 @@ async function handleCheckoutCompleted(
   // supprimée entre le checkout et le webhook → on rembourse immédiatement.
   // L'acheteur ne doit JAMAIS payer un objet qui ne lui sera pas livré.
   if (!updated || updated.length === 0) {
-    const { data: cancelled } = await service
+    const { data: cancelled, error: cancelledError } = await service
       .from('marketplace_orders')
-      .select('id, status')
+      .select('id, status, escrow_status, stripe_payment_intent_id')
       .eq('id', orderId)
       .maybeSingle();
+    if (cancelledError) throw new Error(`read checkout order: ${cancelledError.code}`);
     // Commande introuvable = supprimée : idem, on rembourse.
     if (!cancelled || cancelled.status === 'cancelled') {
+      if (cancelled?.escrow_status === 'refunded'
+          && cancelled.stripe_payment_intent_id === paymentIntentId) {
+        const { data: refundProof, error: proofError } = await service
+          .from('order_settlements')
+          .select('refund_accounted_at')
+          .eq('order_id', cancelled.id)
+          .maybeSingle();
+        if (proofError) throw new Error(`refund proof ${cancelled.id}: ${proofError.code}`);
+        if (refundProof?.refund_accounted_at) return;
+      }
       const refund = await getStripe().refunds.create({ payment_intent: paymentIntentId });
       if (refund.status === 'failed') {
         throw new Error(`refund orphan ${paymentIntentId}: failed`);
@@ -169,39 +183,8 @@ async function handleRefunded(
   charge: Stripe.Charge,
   service: ServiceClient
 ): Promise<void> {
-  const paymentIntentId =
-    typeof charge.payment_intent === 'string' ? charge.payment_intent : null;
-  if (!paymentIntentId) return;
-
-  const { data: refunded, error } = await service
-    .from('marketplace_orders')
-    .update({
-      status: 'cancelled',
-      escrow_status: 'refunded',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('stripe_payment_intent_id', paymentIntentId)
-    .in('status', ['paid', 'shipped', 'delivered', 'completed'])
-    .select('id, stripe_transfer_id');
-
-  if (error) throw new Error(`update refunded: ${error.code ?? error.message}`);
-
-  for (const order of refunded ?? []) {
-    // Vente complétée déjà créditée (points wallet + ligne ventes) → clawback
-    // atomique côté SQL. Idempotent : plus de vente = retour 0, rien à faire.
-    const { error: reverseError } = await service.rpc('reverse_sale', {
-      p_order: order.id,
-    });
-    if (reverseError) throw new Error(`reverse_sale ${order.id}: ${reverseError.code}`);
-
-    // Le net a déjà été viré au compte Connect → on l'inverse côté Stripe.
-    if (order.stripe_transfer_id) {
-      try {
-        await getStripe().transfers.createReversal(order.stripe_transfer_id);
-      } catch {
-        // Inversion impossible (déjà reversée/fonds insuffisants) : la dette
-        // reste traçable via la commande refunded + le transfert initial.
-      }
-    }
-  }
+  await refundCompletedSale(charge, {
+    store: service,
+    getTransfers: () => getStripe().transfers,
+  });
 }

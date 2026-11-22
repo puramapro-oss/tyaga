@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import CommandeActions from '@/components/marketplace/CommandeActions';
 import PackingChecklist from '@/components/marketplace/PackingChecklist';
+import { orderPaymentLabel } from '@/lib/order-payment-label';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { formatDate, formatPrice } from '@/lib/utils';
 
@@ -23,19 +24,13 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Annulée',
 };
 
-const ESCROW_LABELS: Record<string, string> = {
-  none: 'Paiement non réglé',
-  held: 'Fonds sous séquestre',
-  released: 'Vendeur payé',
-  refunded: 'Remboursée',
-};
-
 interface OrderRow {
   id: string;
   buyer_id: string;
   seller_id: string;
   status: string;
   escrow_status: string;
+  stripe_transfer_id: string | null;
   amount_cents: number;
   net_amount_cents: number;
   commission_amount_cents: number;
@@ -58,7 +53,7 @@ export default async function CommandesPage({
   const { data: orders } = await supabase
     .from('marketplace_orders')
     .select(
-      `id, buyer_id, seller_id, status, escrow_status, amount_cents,
+      `id, buyer_id, seller_id, status, escrow_status, stripe_transfer_id, amount_cents,
        net_amount_cents, commission_amount_cents, shipping_address, created_at,
        annonces ( id, title )`
     )
@@ -126,7 +121,7 @@ export default async function CommandesPage({
                   </span>
                 )}
                 <span className="text-foreground-muted">
-                  {ESCROW_LABELS[o.escrow_status] ?? o.escrow_status}
+                  {orderPaymentLabel(o)}
                 </span>
               </div>
 
@@ -152,7 +147,11 @@ export default async function CommandesPage({
                 <PackingChecklist orderId={o.id} />
               )}
 
-              <CommandeActions orderId={o.id} status={o.status} role={o.role} />
+              <CommandeActions
+                orderId={o.id} status={o.status} role={o.role}
+                settlementPending={!o.stripe_transfer_id && o.net_amount_cents > 0
+                  && o.escrow_status !== 'refunded'}
+              />
             </li>
           ))}
         </ul>
