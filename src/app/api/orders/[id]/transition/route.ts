@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { fiscalYearParis } from '@/lib/fiscal';
+import { finalizeCompletedSale } from '@/lib/order-settlement';
 import {
   assertTransition,
   TransitionError,
@@ -9,18 +9,17 @@ import {
   type OrderStatus,
 } from '@/lib/order-transitions';
 import { rateLimit } from '@/lib/rate-limit';
-import { payReferralN1 } from '@/lib/referral';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { pointsFromNet } from '@/lib/vida';
 
 /**
  * EX-E3 — transitions de commande par action de la bonne partie.
  * La RLS `orders_update` est la garde FINALE ; ce routeur valide avant
  * pour renvoyer des erreurs FR claires. Après `deliver` (acheteur), le
- * système enchaîne delivered→completed : séquestre libéré + ligne `ventes`
- * + virement Connect si le vendeur a un compte.
+ * système enchaîne delivered→completed : vente et points atomiques, puis
+ * une tentative de virement Connect. Le séquestre reste held tant qu'aucun
+ * reçu correspondant n'est enregistré (sauf net vendeur nul).
  */
 
 const bodySchema = z.object({
@@ -82,14 +81,17 @@ export async function POST(
   }
 
   // Rejouer `deliver` après un échec de finalisation : la commande est déjà
-  // delivered/completed mais la vente peut manquer → on relance finalize
-  // (idempotent) au lieu de renvoyer un 409 à l'acheteur.
+  // delivered/completed : la RPC sérialise la comptabilité et ne consomme
+  // qu'un seul droit de virement. Une reprise rapproche uniquement le reçu.
   if (
     parsed.data.action === 'deliver' &&
     (order.status === 'delivered' || order.status === 'completed')
   ) {
     try {
-      await finalizeCompletedSale(order.id);
+      const settled = await settleOrder(order.id, user.id);
+      return NextResponse.json(settled, {
+        status: settled.settlement.status === 'verification_required' ? 202 : 200,
+      });
     } catch (e) {
       console.error(`finalize ${order.id}:`, e);
       return NextResponse.json(
@@ -97,9 +99,6 @@ export async function POST(
         { status: 500 }
       );
     }
-    return NextResponse.json({
-      order: { id: order.id, status: order.status, escrow_status: order.escrow_status },
-    });
   }
 
   try {
@@ -121,6 +120,7 @@ export async function POST(
     .from('marketplace_orders')
     .update({ status: to, updated_at: now })
     .eq('id', order.id)
+    .eq('status', order.status)
     .select('id, status, escrow_status')
     .single();
 
@@ -147,7 +147,10 @@ export async function POST(
   // à l'acheteur (il peut rejouer) au lieu de mentir avec un 200.
   if (to === 'delivered') {
     try {
-      await finalizeCompletedSale(order.id);
+      const settled = await settleOrder(order.id, user.id);
+      return NextResponse.json(settled, {
+        status: settled.settlement.status === 'verification_required' ? 202 : 200,
+      });
     } catch (e) {
       console.error(`finalize ${order.id}:`, e);
       return NextResponse.json(
@@ -163,113 +166,9 @@ export async function POST(
   return NextResponse.json({ order: updated });
 }
 
-/**
- * delivered→completed : séquestre libéré + ventes + wallet + parrainage +
- * retrait de l'annonce + virement Connect (si compte). Idempotent : chaque
- * étape tolère le rejeu (.eq status, UNIQUE order_id). Lève en cas d'échec
- * de commande/vente/crédit — le caller rejouera.
- */
-async function finalizeCompletedSale(orderId: string): Promise<void> {
-  const service = createServiceClient();
-
-  const { data: order, error: orderError } = await service
-    .from('marketplace_orders')
-    .select(
-      'annonce_id, seller_id, amount_cents, commission_amount_cents, net_amount_cents'
-    )
-    .eq('id', orderId)
-    .single();
-  if (orderError || !order) {
-    throw new Error(`lecture commande (${orderError?.code ?? 'absente'})`);
-  }
-
-  const now = new Date().toISOString();
-  // Jury bugs P6 : sans .select, un UPDATE silencieux à 0 ligne (statut
-  // inattendu) laissait filer l'insert ventes → vente créditée sans commande
-  // completed. 0 ligne = OK uniquement si déjà completed (rejeu idempotent).
-  const { data: done, error: completeError } = await service
-    .from('marketplace_orders')
-    .update({ status: 'completed', escrow_status: 'released', updated_at: now })
-    .eq('id', orderId)
-    .eq('status', 'delivered')
-    .select('id')
-    .maybeSingle();
-  if (completeError) throw new Error(`passage completed (${completeError.code})`);
-  if (!done) {
-    const { data: current } = await service
-      .from('marketplace_orders')
-      .select('status')
-      .eq('id', orderId)
-      .single();
-    if (current?.status !== 'completed') {
-      throw new Error('passage completed (statut inattendu)');
-    }
-  }
-
-  // EX-E2 : ligne de vente tracée (commission + net). Unique sur order_id.
-  const { error: venteError } = await service.from('ventes').insert({
-    order_id: orderId,
-    seller_id: order.seller_id,
-    gross_amount_cents: order.amount_cents,
-    commission_amount_cents: order.commission_amount_cents,
-    net_amount_cents: order.net_amount_cents,
-    fiscal_year: fiscalYearParis(new Date()),
+function settleOrder(orderId: string, buyerId: string) {
+  return finalizeCompletedSale(orderId, buyerId, {
+    store: createServiceClient(),
+    getTransfers: () => getStripe().transfers,
   });
-  if (venteError?.code === '23505') {
-    // Vente déjà enregistrée par un essai précédent → pas de double crédit.
-  } else if (venteError) {
-    throw new Error(`ligne vente (${venteError.code})`);
-  } else {
-    // EX-H1 : wallet Vida crédité en points (1 pt = 1 € net) uniquement quand
-    // la ligne de vente est NOUVELLE. Si le crédit échoue on retire la ligne
-    // (compensation) pour qu'un rejeu reparte d'un état propre.
-    const points = pointsFromNet(order.net_amount_cents);
-    if (points > 0) {
-      const { error: creditError } = await service.rpc('credit_wallet', {
-        p_user: order.seller_id,
-        p_points: points,
-      });
-      if (creditError) {
-        await service.from('ventes').delete().eq('order_id', orderId);
-        throw new Error(`crédit wallet (${creditError.code})`);
-      }
-    }
-    // Parrainage V4 N1 : 50 % de la commission au parrain si le vendeur est
-    // un filleul à sa première vente complétée — jamais bloquant pour la vente.
-    try {
-      await payReferralN1(service, order.seller_id, order.commission_amount_cents);
-    } catch {
-      // Crédit parrain reporté ; flag `commission_paid` garantit l'absence de double paie
-    }
-
-    // Objet vendu → l'annonce est retirée de la marketplace (plus visible).
-    await service
-      .from('annonces')
-      .update({ status: 'unpublished', updated_at: now })
-      .eq('id', order.annonce_id)
-      .eq('status', 'published');
-  }
-
-  // Virement Connect si le vendeur a un compte — jamais bloquant pour la vente
-  const { data: profile } = await service
-    .from('profiles')
-    .select('stripe_connect_account_id')
-    .eq('id', order.seller_id)
-    .single();
-  if (!profile?.stripe_connect_account_id) return;
-
-  try {
-    const transfer = await getStripe().transfers.create({
-      amount: order.net_amount_cents,
-      currency: 'eur',
-      destination: profile.stripe_connect_account_id,
-      metadata: { app_slug: 'tyaga', order_id: orderId },
-    });
-    await service
-      .from('marketplace_orders')
-      .update({ stripe_transfer_id: transfer.id, updated_at: now })
-      .eq('id', orderId);
-  } catch {
-    // Virement reporté (solde/limites) : vente reste completed, transfert rejouable
-  }
 }

@@ -8,16 +8,19 @@
     "start": "next start",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test:unit": "node --conditions=react-server --import ./tests/ts-resolve.mjs --test tests/*.test.ts"
+    "test:unit": "node --conditions=react-server --import ./tests/ts-resolve.mjs --test tests/*.test.ts",
+    "test:settlement:sql": "node --experimental-vm-modules --conditions=react-server --import ./tests/ts-resolve.mjs --test --test-concurrency=1 tests/order-settlement.sql.mjs tests/order-transition-route.sql.mjs tests/order-refund.sql.mjs",
+    "test:auth-callback": "node --experimental-vm-modules --test tests/auth-callback.test.mjs",
+    "test:postgres-concurrency": "node --test --test-concurrency=1 tests/order-concurrency.postgres.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
-    "@capacitor/android": "^7.6.8",
+    "@capacitor/android": "^7.6.9",
     "@capacitor/app": "^7.1.2",
-    "@capacitor/cli": "^7.6.8",
-    "@capacitor/core": "^7.6.8",
+    "@capacitor/cli": "^7.6.9",
+    "@capacitor/core": "^7.6.9",
     "@capacitor/haptics": "^7.0.5",
-    "@capacitor/ios": "^7.6.8",
+    "@capacitor/ios": "^7.6.9",
     "@capacitor/preferences": "^7.0.4",
     "@capacitor/splash-screen": "^7.0.5",
     "@capacitor/status-bar": "^7.0.6",
@@ -26,16 +29,17 @@
     "clsx": "^2.1.1",
     "framer-motion": "^13.1.1",
     "lucide-react": "^1.30.0",
-    "next": "^15.5.0",
+    "next": "^15.5.29",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "resend": "^6.22.0",
     "server-only": "^0.0.1",
     "stripe": "^22.4.0",
     "tailwind-merge": "^3.6.0",
-    "zod": "^3.24.1"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.17",
     "@eslint/eslintrc": "^3.3.6",
     "@playwright/test": "^1.62.1",
     "@types/node": "^22.13.7",
@@ -44,9 +48,15 @@
     "@typescript-eslint/parser": "^8.66.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.30.0",
-    "eslint-config-next": "^15.5.0",
-    "postcss": "^8.5.1",
+    "eslint-config-next": "^15.5.29",
+    "jsdom": "29.0.2",
+    "postcss": "^8.5.23",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3"
+  },
+  "overrides": {
+    "postcss": "$postcss",
+    "brace-expansion@^1.1.0": "^1.1.21",
+    "sharp": "^0.35.5"
   }
 }

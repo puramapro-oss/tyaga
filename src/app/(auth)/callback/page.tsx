@@ -3,49 +3,63 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 
+import { internalRedirectPath } from '@/lib/auth-redirect';
 import { createClient } from '@/lib/supabase';
 
 /**
  * Fin de parcours OAuth / confirmation e-mail : échange le code contre une
- * session puis redirige. Un seul essai garanti par le ref (React 18 double
- * montage en dev).
+ * session puis redirige. La promesse partagée évite de consommer deux fois
+ * le code lors de la reprise des effets en StrictMode.
  */
 function CallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-  const tried = useRef(false);
+  const attempt = useRef<Promise<boolean> | null>(null);
 
   useEffect(() => {
-    if (tried.current) return;
-    tried.current = true;
-
     const code = searchParams.get('code');
     // Redirection interne uniquement : un `next` externe (//evil.com, https://…)
     // serait une ouverture de redirection après connexion.
-    const rawNext = searchParams.get('next') ?? '/dashboard';
-    const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard';
+    const next = internalRedirectPath(searchParams.get('next'));
     if (!code) {
       setError('Lien de connexion incomplet. Redémarre la connexion.');
       return;
     }
-    createClient()
-      .auth.exchangeCodeForSession(code)
-      .then(({ error: exchangeError }) => {
-        if (exchangeError) {
-          setError(
-            `Connexion impossible (${exchangeError.message}). Redémarre la connexion.`
-          );
+    if (!attempt.current) {
+      const authCode = code;
+      attempt.current = (async () => {
+        try {
+          const { data, error: exchangeError } = await createClient().auth.exchangeCodeForSession(authCode);
+          return !exchangeError && Boolean(data.session && data.user?.id);
+        } catch {
+          return false;
+        }
+      })();
+    }
+
+    let active = true;
+    async function complete() {
+      try {
+        const authenticated = await attempt.current;
+        if (!active) return;
+        if (!authenticated) {
+          setError('Connexion impossible. Redémarre la connexion.');
           return;
         }
         router.push(next);
         router.refresh();
-      });
+      } catch {
+        if (active) setError('Connexion impossible. Redémarre la connexion.');
+      }
+    }
+    void complete();
+    return () => { active = false; };
   }, [router, searchParams]);
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-6">
-      <p className="text-sm text-foreground-muted">
+      <p role={error ? 'alert' : 'status'} className="text-sm text-foreground-muted">
         {error ?? 'Connexion en cours…'}
       </p>
     </main>
