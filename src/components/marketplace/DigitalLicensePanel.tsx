@@ -11,9 +11,13 @@ type License =
   | { state: 'expired' | 'active'; terms: string; expiresAt: string | null; acquiredAt: string; text?: string };
 type ResponseState = License & { serverNow: string; sample?: boolean };
 
-export default function DigitalLicensePanel({ annonceId, isOwner, priceCents }: {
-  annonceId: string; isOwner: boolean; priceCents: number;
-}) {
+type PanelProps = { annonceId: string; isOwner: boolean; priceCents: number };
+
+export default function DigitalLicensePanel(props: PanelProps) {
+  return <LicenseContent key={`${props.annonceId}:${props.isOwner}:${props.priceCents}`} {...props} />;
+}
+
+function LicenseContent({ annonceId, isOwner, priceCents }: PanelProps) {
   const heading = useId();
   const [license, setLicense] = useState<ResponseState | null>(null);
   const [error, setError] = useState('');
