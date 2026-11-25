@@ -14,6 +14,8 @@ Les extensions s’appliquent à la base PostgreSQL de TYAGA sur une version inc
 6. public-listing-previews.sql
 7. physical-sale-fee-v2.sql
 8. licensed-files.sql
+9. promotion-points-pilot.sql
+10. published-listing-benefits.sql
 
 Après installation recharger le cache de schéma PostgREST avec `NOTIFY pgrst, 'reload schema';`. Exécuter les régressions sur une base jetable. Les contrôles d’intégration sous PGlite se lancent avec `npm run test:member-marketplace`. La recette de concurrence native utilise `tests/listing-promotion-concurrency.mjs`, le pilote pg et deux connexions PostgreSQL indépendantes.
 
@@ -27,6 +29,10 @@ Les licences payantes utilisent exclusivement des échantillons sur un environne
 
 L’administrateur peut renseigner `TYAGA_LISTING_PROMOTION_QUOTE` pour publier un devis daté. Le prix TTC en centimes et le prix en points sont des valeurs indépendantes. Les reçus de règlement proviennent du prestataire compétent. L’adaptateur de confiance doit vérifier le paiement et sa devise ou le débit définitif des points, le titulaire, le montant, le barème et la durée. Il réserve l’inventaire et remet un seul bon avec `tyaga_promotion.issue_grant`; il conserve la référence originale et utilise `revoke_grant` pour rapprocher les annulations. Les membres activent les bons disponibles sur leurs annonces. L’interface étiquette et limite les emplacements sponsorisés dans les résultats compatibles. Le portefeuille VIDA conserve son usage propre.
 
+## Avantage de publication
+
+Une campagne active de `tyaga_promotion.publication_campaigns` peut offrir un bon à la première publication admissible d’une annonce d’offre ou de recherche. L’opérateur renseigne les références du financement et des emplacements réservés, la période, la durée de visibilité et les plafonds de campagne et par membre. Le parcours contrôle en base l’identité de l’auteur, la validation de l’annonce, le contenu de sa description et les champs requis pour le type de bien. Un retrait suivi d’une republication et une copie de même titre normalisé, même type et même sens par la même personne ne déclenchent pas un deuxième bon. L’interface identifie le bon reçu sur l’annonce d’origine. Les campagnes commencent sans dotation et l’historique antérieur à leur installation est exclu.
+
 ## Tarif physique de recette
 
 Le tarif historique des annonces existantes est conservé. Le pilote français permet à deux comptes particuliers de test qualifiés de valider un prix produit, des frais acheteur de 2,9 % + 0,35 € et un net vendeur égal au prix produit. Le vendeur choisit ce tarif avant publication. L’acheteur reconfirme le total lorsqu’un accord négocié change. Les commandes de test distinguent le prix produit des frais acheteur, restent exclues des avantages réels et du parrainage. Pour une recette isolée, renseigner une origine dédiée dans `TYAGA_PHYSICAL_FEE_TEST_ORIGIN` et `TYAGA_PHYSICAL_FEE_TEST=1`, avec les clés Stripe de test et des profils de test FR qualifiés dans `tyaga_fee.pilot_sellers`. À 50 € de prix produit, le total acheteur est de 51,80 € et le net vendeur de 50 €. Aucun résultat de recette n’autorise un règlement en production.
@@ -35,4 +41,12 @@ Le tarif historique des annonces existantes est conservé. Le pilote français p
 
 Une campagne de récompenses transactionnelles se configure dans `tyaga_promotion.sale_campaigns` par l’exploitant de la base. Elle exige une référence d’inventaire publicitaire effectivement réservée, une fenêtre de vente, un nombre maximal de paires de bons, une limite par personne, un minimum de vente et les durées de diffusion et de validité. La table est vide à l’installation. Les quotas comptent également les bons révoqués. Chaque vente effectivement réglée et rapprochée peut alors attribuer un bon à l’acheteur et un bon au vendeur. Le numéro de commande assure l’unicité. Le remboursement ou le passage du règlement en réexamen retire les droits. Les bons et leur statut apparaissent dans Commandes. Le rapprochement serveur peut rejouer `tyaga_promotion.award_sale(order_id)` pendant la campagne si l’attribution a été différée.
 
-Les reçus PAY et les confirmations d’un débit en points demandent un raccordement au prestataire ou au registre compétent. Le lancement d’un règlement en crypto requiert la qualification du jeton et du prestataire pour chaque territoire servi. Une publication gratuite ne génère aucun solde transférable.
+## Acheter un bon avec des points en recette
+
+Ce parcours utilise le registre de points PAY dans la même base PostgreSQL isolée que TYAGA, avec une identité de test commune. Le serveur consulte le prix de la campagne et les points que ce participant est autorisé à y dépenser. Après confirmation du membre, le débit PAY `debit_catalog` et la délivrance du bon sont enregistrés dans une seule transaction. L’acheteur choisit ensuite quand utiliser le bon. Une annulation administrative d’un bon inutilisé rapproche le débit initial, retire le bon et inscrit un mouvement PAY `reversal`.
+
+Pour reproduire le parcours, installer le schéma officiel PAY sur une base de recette jetable. L’opérateur qualifie cette base avec le paramètre de base `tyaga.promotion_points_environment=isolated_test`. Il inscrit une offre datée dans `tyaga_promotion.points_pilot_offers`, son inventaire réservé et son tarif en points, puis renseigne dans `points_pilot_members` l’autorisation du participant synthétique pour cette campagne. Chaque modification de prix nécessite une nouvelle référence de tarif. Les tables de campagne sont vides à l’installation. La nouvelle interface exige `TYAGA_PROMOTION_POINTS_TEST=1`, l’origine dédiée `TYAGA_PROMOTION_POINTS_TEST_ORIGIN` et une origine Supabase isolée dans `TYAGA_PROMOTION_POINTS_TEST_SUPABASE_ORIGIN` qui correspond à `NEXT_PUBLIC_SUPABASE_URL`.
+
+Pour tester avec le registre canonique, fournir le fichier SQL PAY de la révision `03edd69`, le pilote Node `pg` et les exécutables PostgreSQL `initdb` et `pg_ctl`, puis lancer `PAY_SCHEMA_PATH=/chemin/vers/schema.sql node tests/promotion-points-pilot.postgres.mjs`. Le test crée une base locale éphémère et vérifie l’empreinte du fichier avant de l’utiliser. La suite générale vérifie aussi la fermeture du parcours en l’absence de PAY.
+
+Un bon n’attribue aucune valeur en euros aux points. L’utilisation commerciale de points exige les conditions d’émission appropriées pour le programme et un environnement PAY exploitable. Pour les nouveaux achats de visibilité en euros, le raccordement au prestataire reste à réaliser. Le lancement d’un règlement en crypto requiert la qualification du jeton et du prestataire pour chaque territoire servi. Une publication gratuite ne génère aucun solde transférable.

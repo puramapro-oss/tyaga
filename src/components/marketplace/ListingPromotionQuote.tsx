@@ -1,7 +1,9 @@
 import 'server-only';
 
+import PointsPromotionCheckout from '@/components/marketplace/PointsPromotionCheckout';
 import PromotionControl from '@/components/marketplace/PromotionControl';
 import { getListingPromotionQuote } from '@/lib/listing-promotion';
+import { pointsPromotionTestOrigin } from '@/lib/promotion-points-test';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { formatPrice } from '@/lib/utils';
 
@@ -21,8 +23,12 @@ function time(value: string) {
 
 export default async function ListingPromotionQuote({ annonceId }: { annonceId: string }) {
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.rpc('my_listing_promotions', { p_listing: annonceId });
+  const [{ data, error }, publication] = await Promise.all([
+    supabase.rpc('my_listing_promotions', { p_listing: annonceId }),
+    supabase.rpc('my_publication_benefit', { p_listing: annonceId }),
+  ]);
   const grants = (data ?? []) as Grant[];
+  const publicationGrant = publication.error ? null : publication.data?.grant_id;
   const campaignActive = grants.some(grant => grant.ends_at !== null);
   const quote = getListingPromotionQuote(process.env.TYAGA_LISTING_PROMOTION_QUOTE);
   return (
@@ -33,7 +39,7 @@ export default async function ListingPromotionQuote({ annonceId }: { annonceId: 
         <ul className="flex flex-col gap-3">
           {grants.map(grant => (
             <li key={grant.grant_id} className="flex flex-col gap-1">
-              <span className="text-sm font-semibold">{kindLabel[grant.kind]} · {grant.duration_hours} h</span>
+              <span className="text-sm font-semibold">{grant.grant_id === publicationGrant ? 'Bon gagné en publiant cette annonce' : kindLabel[grant.kind]} · {grant.duration_hours} h</span>
               <span className="text-xs text-foreground-muted">{grant.ends_at
                 ? 'En cours jusqu’au ' + time(grant.ends_at) + ' (Paris). Un arrêt met fin à ce bon.'
                 : 'À activer avant le ' + time(grant.redeem_until) + ' (Paris).'}</span>
@@ -48,9 +54,10 @@ export default async function ListingPromotionQuote({ annonceId }: { annonceId: 
             quote.priceEurCentsTtc === null ? null : formatPrice(quote.priceEurCentsTtc) + ' TTC',
             quote.puramaPoints === null ? null : quote.puramaPoints.toLocaleString('fr-FR') + ' points PURAMA',
           ].filter(Boolean).join(' ou ')}. Valable jusqu’au {time(quote.endsAt)} (Paris), réf. {quote.revision}.
-          L’achat de nouveaux bons est fermé.
+          Ce devis web est présenté à titre indicatif.
         </p>
       )}
+      {pointsPromotionTestOrigin(process.env) && <PointsPromotionCheckout key={annonceId} listingId={annonceId} />}
     </section>
   );
 }
