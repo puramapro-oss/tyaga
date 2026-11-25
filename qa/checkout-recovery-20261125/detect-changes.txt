@@ -1,0 +1,34 @@
+
+  GitNexus Detect Changes (1.6.12)
+{"level":40,"time":1795633824707,"name":"gitnexus","msg":"GitNexus: FTS extension unavailable; continuing without FTS features. load-only policy (no install attempted); LOAD fts failed: Binder exception: Extension: fts is an official extension and has not been installed. You can install it by: install fts."}
+Changes: 15 files, 122 symbols
+Affected processes: 8
+Risk level: high
+
+Changed symbols:
+  Function POST → src/app/api/orders/[id]/transition/route.ts
+  Function settleOrder → src/app/api/orders/[id]/transition/route.ts
+  Function POST → src/app/api/orders/route.ts
+  Function verificationRequired → src/app/api/orders/route.ts
+  Function conflict → src/app/api/orders/route.ts
+  Function validSession → src/app/api/orders/route.ts
+  Function resumePendingCheckout → src/app/api/orders/route.ts
+  Const require → tests/checkout-order-route.test.mjs
+  Const ts → tests/checkout-order-route.test.mjs
+  Const routeSource → tests/checkout-order-route.test.mjs
+  Const ids → tests/checkout-order-route.test.mjs
+  Property buyer → tests/checkout-order-route.test.mjs
+  Property seller → tests/checkout-order-route.test.mjs
+  Property other → tests/checkout-order-route.test.mjs
+  Property listing → tests/checkout-order-route.test.mjs
+... and 107 more
+
+Affected execution flows:
+  • POST → PhysicalBuyerFeeCents (5 steps) — changed: POST
+  • POST → ComputeCommission (4 steps) — changed: POST
+  • SettleOrder → Matches (3 steps) — changed: settleOrder
+  • SettleOrder → Result (3 steps) — changed: settleOrder
+  • SettleOrder → GetTransfers (3 steps) — changed: settleOrder
+  • POST → AgreedSalePrice (3 steps) — changed: POST
+  • POST → LatestOffer (3 steps) — changed: POST
+  • POST → IsPhysicalPilotPolicy (4 steps) — changed: POST

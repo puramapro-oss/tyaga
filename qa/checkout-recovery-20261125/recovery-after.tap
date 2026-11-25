@@ -1,0 +1,51 @@
+(node:12) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/src/lib/physical-fee-policy.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ provider response lost: preserve the pending order and a retry never emits another session (71.647035ms)
+✔ a failed session receipt write never advertises a usable checkout (6.86621ms)
+✔ receipt acknowledgement lost after commit: retry reads the original session and recovers (6.498395ms)
+✔ a successful request can be replayed after rename or an old timestamp without creating again (6.129929ms)
+✔ an old pending order without a stored session is explicit uncertainty, never a fresh create (5.387142ms)
+✔ another buyer cannot resume or replace an existing checkout (5.130465ms)
+✔ changed address or quote cannot silently reuse the earlier contract (10.024274ms)
+✔ mismatched provider receipt is refused: {"amount_total":1} (3.860988ms)
+✔ mismatched provider receipt is refused: {"currency":"usd"} (4.544209ms)
+✔ mismatched provider receipt is refused: {"metadata":{"app_slug":"other"}} (4.632636ms)
+✔ mismatched provider receipt is refused: {"client_reference_id":"another-order"} (5.615273ms)
+✔ mismatched provider receipt is refused: {"mode":"subscription"} (4.986914ms)
+✔ mismatched provider receipt is refused: {"id":"not-a-checkout"} (4.750756ms)
+✔ expired and complete sessions do not return a checkout URL or create a new one (11.240581ms)
+✔ lookup failure never falls through into a new financial operation (4.804033ms)
+✔ a concurrent order transition prevents the route returning a stale checkout (6.681816ms)
+✔ unauthenticated requests and the 3 percent pilot retain their existing contracts (18.641094ms)
+✔ actual BuyPanel displays the uncertain-payment error and never navigates to a missing URL (51.66669ms)
+✔ buyer cancellation requires an expired matching provider receipt before the server action (10.193788ms)
+✔ seller cancellation requires an expired matching provider receipt before the server action (8.214597ms)
+✔ unknown checkout outcome cannot be cancelled to open another checkout (10.024088ms)
+✔ expiry reconciliation: already_expired (8.368862ms)
+✔ expiry reconciliation: expiry_response_lost (9.394524ms)
+✔ failed expiry preserves an open checkout and its order (11.286971ms)
+✔ payment won the race: complete (9.969668ms)
+✔ payment won the race: paid (6.043393ms)
+✔ cancellation refuses an unmatched expiry receipt: {"amount_total":1} (6.169721ms)
+✔ cancellation refuses an unmatched expiry receipt: {"metadata":{}} (6.454852ms)
+✔ cancellation refuses an unmatched expiry receipt: {"id":"cs_test_other"} (6.197232ms)
+✔ missing cancellation migration never falls back to a direct order update (5.847797ms)
+✔ payment recorded before cancellation finalization prevents a cancelled response (6.193882ms)
+✔ lost cancellation acknowledgement is honest and replay reconciles the same receipt (8.934456ms)
+✔ failed pre-checkout cleanup remains explicit: cleanupError (7.377673ms)
+✔ failed pre-checkout cleanup remains explicit: cleanupNoRows (7.651775ms)
+✔ failed pre-checkout cleanup remains explicit: cleanupThrows (6.93624ms)
+✔ definite pre-checkout failure releases the order only after confirmed cleanup (7.299593ms)
+✔ cancellation still requires the authenticated action owner (9.258127ms)
+ℹ tests 37
+ℹ suites 0
+ℹ pass 37
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1015.525903
