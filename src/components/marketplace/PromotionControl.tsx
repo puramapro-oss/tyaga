@@ -3,8 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export default function PromotionControl({ listingId, grantId, active }: {
-  listingId: string; grantId: string; active: boolean;
+export default function PromotionControl({ listingId, grantId, active, buttonLabel }: {
+  listingId: string; grantId: string; active: boolean; buttonLabel?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -31,7 +31,7 @@ export default function PromotionControl({ listingId, grantId, active }: {
   }
   return (
     <div>
-      <button type="button" disabled={pending} onClick={submit} className="min-h-11 rounded-pill border border-border px-4">
+      <button type="button" aria-label={buttonLabel} disabled={pending} onClick={submit} className="min-h-11 rounded-pill border border-border px-4">
         {active ? 'Arrêter la diffusion' : 'Utiliser ce bon'}
       </button>
       <p role="status" className="text-xs">{message}</p>

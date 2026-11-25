@@ -28,7 +28,7 @@ test('TYAGA installe son schéma complet et ses extensions sur une base vierge',
     await db.exec(await read('schema.sql'));
     await db.exec(await read('sql/20261122-order-settlement.sql'));
     await db.exec(await read('sql/20261122-order-refund.sql'));
-    const extensions = ['digital-listings', 'digital-licenses', 'digital-checkout-test', 'listing-promotions', 'sale-promotion-rewards', 'public-listing-previews', 'physical-sale-fee-v2', 'licensed-files', 'promotion-points-pilot', 'published-listing-benefits'];
+    const extensions = ['digital-listings', 'digital-licenses', 'digital-checkout-test', 'listing-promotions', 'sale-promotion-rewards', 'public-listing-previews', 'physical-sale-fee-v2', 'licensed-files', 'promotion-points-pilot', 'published-listing-benefits', 'order-promotion-selection'];
     for (let pass = 0; pass < 2; pass++) {
       for (const name of extensions) await db.exec(await read('sql/' + name + '.sql'));
     }
