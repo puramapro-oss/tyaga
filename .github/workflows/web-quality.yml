@@ -55,6 +55,9 @@ jobs:
       - name: Run application unit tests
         run: npm run test:unit
 
+      - name: Exercise the member marketplace migrations and licensed access
+        run: npm run test:member-marketplace
+
       - name: Exercise the actual authentication callback
         run: npm run test:auth-callback
 

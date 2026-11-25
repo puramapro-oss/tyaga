@@ -38,7 +38,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
     entries: [
       {
         q: 'Combien coûte TYAGA ?',
-        a: '10 % du prix de vente, affichés avant la publication et déduits uniquement si l’objet se vend. Aucun frais d’inscription, aucun frais caché : tu vois le net vendeur exact dès la création de l’annonce.',
+        a: 'Le brouillon indique le tarif appliqué, le total acheteur et le net vendeur. Sur le tarif habituel, la commission est déduite du prix vendeur. Les participants qualifiés à la recette française peuvent tester un tarif distinct de 0 % vendeur et 3,0 % + 0,35 € côté acheteur sur les nouvelles annonces. Les annonces déjà publiées à 2,9 % + 0,35 € conservent ce tarif. Ces paiements sont simulés.',
       },
       {
         q: 'Comment suis-je payé ?',
@@ -102,7 +102,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
       },
       {
         q: 'Le parrainage, comment il marche ?',
-        a: "Partage ton code TY-XXXXXX. Quand une personne parrainée fait sa première vente, tu reçois 50 % de la commission TYAGA sur cette vente, en points Vida.",
+        a: "Partage ton code TY-XXXXXX. Quand une personne parrainée fait sa première vente admissible hors recette, tu reçois 50 % de la commission TYAGA sur cette vente, en points Vida.",
       },
     ],
   },

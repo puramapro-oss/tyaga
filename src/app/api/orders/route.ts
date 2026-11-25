@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { computeCommission } from '@/lib/commission';
+import { createPhysicalPilotCheckout } from '@/lib/physical-pilot-checkout';
+import { isPhysicalPilotPolicy } from '@/lib/physical-fee-policy';
+import { physicalOrderQuote, sameSaleQuote } from '@/lib/physical-order-quote';
+import { expectedSaleQuote } from '@/lib/sale-quote-input';
 import { rateLimit } from '@/lib/rate-limit';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
@@ -24,6 +27,7 @@ const addressSchema = z.object({
 
 const bodySchema = z.object({
   annonceId: z.string().uuid(),
+  expectedQuote: expectedSaleQuote,
   shippingAddress: addressSchema,
 });
 
@@ -65,13 +69,19 @@ export async function POST(request: Request) {
   // Annonce publiée uniquement (RLS annonces_select)
   const { data: annonce } = await supabase
     .from('annonces')
-    .select('id, item_id, user_id, title, price_cents, status')
+    .select('id, item_id, user_id, title, price_cents, status, fee_policy')
     .eq('id', annonceId)
     .eq('status', 'published')
     .maybeSingle();
 
   if (!annonce) {
     return NextResponse.json({ error: 'Annonce introuvable ou retirée.' }, { status: 404 });
+  }
+  if (!annonce.item_id) {
+    return NextResponse.json(
+      { error: 'La commande avec livraison est réservée aux offres de vente d’objets physiques.' },
+      { status: 409 }
+    );
   }
   // EX-E1 : acheteur ≠ vendeur (doublure du CHECK DB buyer_neq_seller)
   if (annonce.user_id === user.id) {
@@ -80,6 +90,19 @@ export async function POST(request: Request) {
       { status: 403 }
     );
   }
+
+  const quote = await physicalOrderQuote(supabase, annonce, user.id);
+  if (!quote) {
+    return NextResponse.json({ error: 'Impossible de vérifier le prix convenu. Réessaie.' }, { status: 503 });
+  }
+  const pilot = isPhysicalPilotPolicy(annonce.fee_policy);
+  if ((pilot && !parsed.data.expectedQuote) || (parsed.data.expectedQuote && !sameSaleQuote(parsed.data.expectedQuote, quote))) {
+    return NextResponse.json({
+      error: 'Les montants ont changé. Vérifie le nouveau détail avant de confirmer.',
+      quote,
+    }, { status: 409 });
+  }
+  if (pilot) return createPhysicalPilotCheckout(supabase, annonce, user.id, quote, shippingAddress);
 
   // Une seule commande active par annonce
   const { count: activeCount } = await supabase
@@ -94,49 +117,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Prix négocié (EX-D) : si la conversation avec le vendeur porte une offre
-  // de l'acheteur que le vendeur a ACCEPTÉE (même montant), c'est ce prix qui
-  // fait foi — sinon on reste au prix de l'annonce.
-  let priceCents = annonce.price_cents;
-  const { data: conv } = await supabase
-    .from('conversations')
-    .select('id')
-    .eq('annonce_id', annonce.id)
-    .eq('buyer_id', user.id)
-    .maybeSingle();
-  if (conv) {
-    // Jury bugs P6 : fenêtre du plus RÉCENT au plus ancien (desc), et l'accept
-    // vendeur ne vaut que s'il est plus récent que la dernière offre acheteur.
-    const { data: msgs } = await supabase
-      .from('inbox_messages')
-      .select('sender_id, offer_cents')
-      .eq('conversation_id', conv.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-    const desc = msgs ?? [];
-    const acceptIdx = desc.findIndex(
-      (m) => m.sender_id === annonce.user_id && m.offer_cents !== null
-    );
-    const offerIdx = desc.findIndex(
-      (m) => m.sender_id === user.id && m.offer_cents !== null
-    );
-    if (acceptIdx !== -1 && offerIdx !== -1 && acceptIdx < offerIdx) {
-      const buyerOffer = desc[offerIdx].offer_cents;
-      const sellerAccept = desc[acceptIdx].offer_cents;
-      if (
-        buyerOffer != null &&
-        sellerAccept != null &&
-        buyerOffer === sellerAccept &&
-        buyerOffer >= 100 &&
-        buyerOffer <= annonce.price_cents
-      ) {
-        priceCents = buyerOffer;
-      }
-    }
-  }
-
-  // EX-E2 : commission calculée SERVEUR à la création, tracée en colonnes
-  const { grossCents, commissionPct, commissionCents, netCents } = computeCommission(priceCents);
+  const { grossCents, commissionPct, commissionCents, netCents } = quote;
 
   // RLS orders_insert : buyer + status pending ✓
   const { data: order, error: orderError } = await supabase
@@ -157,7 +138,7 @@ export async function POST(request: Request) {
     .select('id')
     .single();
 
-  if (orderError?.code === '23505' || !order) {
+  if (orderError?.code === '23505') {
     // idx_orders_annonce_active : un autre acheteur est passé entre le count
     // et l'insert (fenêtre TOCTOU fermée par l'index unique partiel).
     return NextResponse.json(
@@ -165,7 +146,7 @@ export async function POST(request: Request) {
       { status: 409 }
     );
   }
-  if (orderError) {
+  if (orderError || !order) {
     return NextResponse.json(
       { error: 'Commande impossible. Réessaie dans un instant.' },
       { status: 500 }

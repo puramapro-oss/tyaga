@@ -41,6 +41,8 @@ interface ThreadData {
     title: string;
     priceCents: number;
     floorCents: number | null;
+    negotiationEnabled: boolean;
+    isWanted: boolean;
   };
   messages: ThreadMessage[];
   suggestions: ThreadSuggestion[];
@@ -172,7 +174,7 @@ export default function Thread({ conversationId, myId }: { conversationId: strin
           </h1>
           {data && (
             <p className="text-sm text-foreground-muted">
-              Prix affiché <span className="font-mono">{formatPrice(data.conversation.priceCents)}</span>
+              {data.conversation.isWanted ? 'Budget' : 'Prix affiché'} <span className="font-mono">{formatPrice(data.conversation.priceCents)}</span>
               {data.conversation.floorCents !== null && role === 'seller' && (
                 <>
                   {' '}· plancher <span className="font-mono">{formatPrice(data.conversation.floorCents)}</span>
@@ -192,8 +194,7 @@ export default function Thread({ conversationId, myId }: { conversationId: strin
         )}
         {data?.messages.length === 0 && (
           <p className="m-auto max-w-sm text-center text-sm text-foreground-muted">
-            Aucun message. Pose ta première question — le vendeur répond ici,
-            sur TYAGA.
+            Pose ta première question sur cette annonce.
           </p>
         )}
         {data?.messages.map((m) => {
@@ -248,7 +249,7 @@ export default function Thread({ conversationId, myId }: { conversationId: strin
       )}
 
       {/* Offre chiffrée — acheteur uniquement (EX-F3 côté serveur) */}
-      {role === 'buyer' && (
+      {data?.conversation.negotiationEnabled && role === 'buyer' && (
         <form onSubmit={onOffer} className="flex items-center gap-2 pt-3">
           <input
             inputMode="decimal"
@@ -273,7 +274,7 @@ export default function Thread({ conversationId, myId }: { conversationId: strin
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={role === 'seller' ? 'Répondre à l’acheteur…' : 'Écris ton message…'}
+          placeholder="Écris ton message…"
           maxLength={2000}
           className="h-11 flex-1 rounded-md border border-border-control bg-background-soft px-3 text-sm text-foreground placeholder:text-foreground-secondary focus:border-primary"
           aria-label="Message"

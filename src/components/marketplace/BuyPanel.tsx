@@ -3,6 +3,9 @@
 import { Lock, Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
+import SaleFeeSummary from '@/components/marketplace/SaleFeeSummary';
+import type { CommissionBreakdown } from '@/lib/commission';
+import { isPhysicalPilotPolicy } from '@/lib/physical-fee-policy';
 import { formatPrice } from '@/lib/utils';
 
 /**
@@ -13,7 +16,7 @@ import { formatPrice } from '@/lib/utils';
 
 interface BuyPanelProps {
   annonceId: string;
-  priceCents: number;
+  quote: CommissionBreakdown;
 }
 
 const FIELDS = [
@@ -24,7 +27,10 @@ const FIELDS = [
   { name: 'city', label: 'Ville', placeholder: 'Paris' },
 ] as const;
 
-export default function BuyPanel({ annonceId, priceCents }: BuyPanelProps) {
+export default function BuyPanel({ annonceId, quote }: BuyPanelProps) {
+  const [updated, setUpdated] = useState<{ annonceId: string; quote: CommissionBreakdown } | null>(null);
+  const currentQuote = updated?.annonceId === annonceId ? updated.quote : quote;
+  const pilot = isPhysicalPilotPolicy(currentQuote.policy);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({ country: 'FR' });
@@ -41,17 +47,24 @@ export default function BuyPanel({ annonceId, priceCents }: BuyPanelProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           annonceId,
+          expectedQuote: currentQuote,
           shippingAddress: {
             fullName: values.fullName ?? '',
             line1: values.line1 ?? '',
             ...(values.line2 ? { line2: values.line2 } : {}),
             postalCode: values.postalCode ?? '',
             city: values.city ?? '',
-            country: values.country || 'FR',
+            country: pilot ? 'FR' : values.country || 'FR',
           },
         }),
       });
-      const data = (await res.json()) as { url?: string; error?: string };
+      const data = (await res.json()) as { url?: string; error?: string; quote?: CommissionBreakdown };
+      if (res.status === 409 && data.quote) {
+        setUpdated({ annonceId, quote: data.quote });
+        setError('Le prix ou les frais ont changé. Vérifie le nouveau détail puis confirme si tu souhaites acheter.');
+        setLoading(false);
+        return;
+      }
       if (!res.ok || !data.url) {
         setError(data.error ?? 'Achat impossible. Réessaie dans un instant.');
         setLoading(false);
@@ -66,6 +79,7 @@ export default function BuyPanel({ annonceId, priceCents }: BuyPanelProps) {
 
   return (
     <section className="glass flex flex-col gap-4 p-6" aria-label="Acheter cet objet">
+      <SaleFeeSummary quote={currentQuote} />
       <form onSubmit={onSubmit} className="flex flex-col gap-3">
         <p className="text-sm font-medium">Adresse de livraison</p>
         {FIELDS.map((f) => (
@@ -87,7 +101,8 @@ export default function BuyPanel({ annonceId, priceCents }: BuyPanelProps) {
             name="country"
             placeholder="FR"
             maxLength={2}
-            value={values.country ?? 'FR'}
+            value={pilot ? 'FR' : values.country ?? 'FR'}
+            readOnly={pilot}
             onChange={(e) =>
               setValues((v) => ({ ...v, country: e.target.value.toUpperCase() }))
             }
@@ -112,12 +127,12 @@ export default function BuyPanel({ annonceId, priceCents }: BuyPanelProps) {
           ) : (
             <Lock size={16} />
           )}
-          Acheter — {formatPrice(priceCents)}
+          {pilot ? 'Tester le paiement' : 'Acheter'} — {formatPrice(currentQuote.grossCents)}
         </button>
       </form>
       <p className="text-xs leading-relaxed text-foreground-muted">
-        Paiement sécurisé via Stripe — aucun règlement hors plateforme. Le
-        vendeur est payé seulement après ta confirmation de réception.
+        {pilot ? 'Le paiement de test simule la transaction sans débit bancaire.' :
+          'Paiement sécurisé via Stripe — aucun règlement hors plateforme. Le vendeur est payé seulement après ta confirmation de réception.'}
       </p>
     </section>
   );

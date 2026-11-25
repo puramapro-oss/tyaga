@@ -12,14 +12,14 @@ import {
   PasswordField,
   SubmitButton,
 } from '@/components/auth/AuthFields';
+import { authContinuationHref, internalRedirectPath } from '@/lib/auth-redirect';
 import { createClient } from '@/lib/supabase';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Redirection interne uniquement (anti open redirect après connexion)
-  const rawNext = searchParams.get('next') ?? '/dashboard';
-  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/dashboard';
+  const next = internalRedirectPath(searchParams.get('next'));
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +55,7 @@ function LoginForm() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/callback?next=${encodeURIComponent(next)}`,
+        redirectTo: window.location.origin + authContinuationHref('/callback', next),
       },
     });
   }
@@ -82,7 +82,7 @@ function LoginForm() {
         </Link>
         <span className="text-foreground-secondary">
           Pas de compte ?{' '}
-          <Link href="/signup" className="link-action">
+          <Link href={authContinuationHref('/signup', next)} className="link-action">
             Créer un compte
           </Link>
         </span>

@@ -79,6 +79,7 @@ export async function POST(request: Request) {
   const { data: vente } = await supabase
     .from('ventes')
     .select('id, net_amount_cents')
+    .eq('fee_policy', 'legacy')
     .eq('id', venteId)
     .maybeSingle();
   if (!vente) {

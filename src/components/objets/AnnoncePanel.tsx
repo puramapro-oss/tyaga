@@ -4,7 +4,9 @@ import { Check, ClipboardCopy, Megaphone, RefreshCw, Sparkles } from 'lucide-rea
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-import { formatPrice } from '@/lib/utils';
+import SaleFeeSummary from '@/components/marketplace/SaleFeeSummary';
+import type { CommissionBreakdown } from '@/lib/commission';
+import { isPhysicalPilotPolicy } from '@/lib/physical-fee-policy';
 
 /**
  * EX-D — annonce assistée. Génération (brouillon IA montré AVANT publication,
@@ -16,7 +18,8 @@ interface ListingDraft {
   title: string;
   description: string;
   tags: string[];
-  price_cents: number;
+  quote: CommissionBreakdown;
+  pilotQuote?: CommissionBreakdown | null;
 }
 
 export default function AnnoncePanel({
@@ -30,6 +33,8 @@ export default function AnnoncePanel({
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState<ListingDraft | null>(null);
+  const [pilot, setPilot] = useState(false);
+  const selectedQuote = pilot && draft?.pilotQuote ? draft.pilotQuote : draft?.quote;
   const [loading, setLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [validated, setValidated] = useState(false); // EX-D2 : action utilisateur
@@ -39,12 +44,14 @@ export default function AnnoncePanel({
   useEffect(() => {
     // reset si l'objet change (navigation client)
     setDraft(null);
+    setPilot(false);
     setValidated(false);
     setError(null);
     setCopied(false);
   }, [itemId]);
 
   async function generate() {
+    setPilot(false);
     setLoading(true);
     setError(null);
     setValidated(false);
@@ -56,7 +63,7 @@ export default function AnnoncePanel({
         signal: AbortSignal.timeout(45_000), // borné, jamais de chargement infini
       });
       const data = (await res.json()) as { draft?: ListingDraft; error?: string };
-      if (!res.ok || !data.draft) {
+      if (!res.ok || !data.draft?.quote) {
         setError(data.error ?? "La génération d'annonce a échoué. Réessaie.");
         return;
       }
@@ -69,7 +76,7 @@ export default function AnnoncePanel({
   }
 
   async function publish() {
-    if (!draft || !validated) return; // EX-D2 : garde double (UI + serveur)
+    if (!draft || !selectedQuote || !validated || publishing || loading) return; // EX-D2 : garde double (UI + serveur)
     setPublishing(true);
     setError(null);
     try {
@@ -81,13 +88,22 @@ export default function AnnoncePanel({
           title: draft.title,
           description: draft.description,
           tags: draft.tags,
+          expectedQuote: selectedQuote,
+          ...(isPhysicalPilotPolicy(selectedQuote.policy) ? { feePolicy: selectedQuote.policy } : {}),
           userValidated: true, // la case cochée est la seule voie vers true
         }),
         signal: AbortSignal.timeout(30_000),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setError(data.error ?? 'La publication a échoué. Réessaie.');
+        if (res.status === 409) {
+          setDraft(null);
+          setValidated(false);
+          router.refresh();
+        }
+        setError(data.error ?? (res.status === 409
+          ? 'Régénère ton brouillon pour vérifier le prix et les frais avant de publier.'
+          : 'La publication a échoué. Réessaie.'));
         return;
       }
       setDraft(null);
@@ -161,7 +177,7 @@ export default function AnnoncePanel({
   }
 
   // ---- Brouillon IA : montré AVANT publication (EX-D1) ----
-  if (draft) {
+  if (draft && selectedQuote) {
     return (
       <section className="glass flex flex-col gap-5 p-6" aria-label="Brouillon d'annonce">
         <div className="flex items-center justify-between gap-4">
@@ -172,7 +188,7 @@ export default function AnnoncePanel({
           <button
             type="button"
             onClick={generate}
-            disabled={loading}
+            disabled={loading || publishing}
             className="flex items-center gap-1.5 text-xs text-foreground-muted transition-colors hover:text-foreground"
           >
             <RefreshCw size={12} className={loading ? 'animate-spin' : undefined} />
@@ -195,7 +211,21 @@ export default function AnnoncePanel({
               </span>
             ))}
           </div>
-          <p className="font-mono text-sm">Prix : {formatPrice(draft.price_cents)}</p>
+          {draft.pilotQuote && (
+            <label className="grid gap-1.5 text-sm">
+              Tarif de cette annonce
+              <select
+                value={pilot ? 'pilot' : 'standard'}
+                disabled={loading || publishing}
+                onChange={event => { setPilot(event.target.value === 'pilot'); setValidated(false); }}
+                className="min-h-11 w-full rounded-md border border-border-control bg-background-soft px-3"
+              >
+                <option value="standard">Tarif habituel</option>
+                <option value="pilot">Tarif de test entre particuliers en France</option>
+              </select>
+            </label>
+          )}
+          <SaleFeeSummary quote={selectedQuote} />
         </div>
 
         {/* EX-D2 : validation explicite, bouton inactif sans elle */}
@@ -203,6 +233,7 @@ export default function AnnoncePanel({
           <input
             type="checkbox"
             checked={validated}
+            disabled={loading || publishing}
             onChange={(e) => setValidated(e.target.checked)}
             className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
           />
@@ -215,7 +246,7 @@ export default function AnnoncePanel({
         <button
           type="button"
           onClick={publish}
-          disabled={!validated || publishing}
+          disabled={!validated || publishing || loading}
           className="flex h-11 w-fit items-center gap-2 rounded-pill bg-primary px-5 text-sm font-semibold text-on-primary disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Megaphone size={16} />

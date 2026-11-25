@@ -1,10 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { internalRedirectPath } from '@/lib/auth-redirect';
+import { marketplaceLoginReturn } from '@/lib/marketplace-filters';
+
 const PUBLIC_PATHS = [
   '/',
   '/login',
   '/signup',
+  '/callback',
   '/forgot-password',
   '/privacy',
   '/terms',
@@ -63,15 +67,15 @@ export async function middleware(request: NextRequest) {
   if (!isPublic(pathname) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('next', pathname);
+    url.search = '';
+    const returnPath = pathname === '/marketplace' ? marketplaceLoginReturn(request.nextUrl.searchParams) : pathname;
+    url.searchParams.set('next', returnPath);
     return NextResponse.redirect(url);
   }
 
   if (user && (pathname === '/login' || pathname === '/signup')) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
-    url.search = '';
-    return NextResponse.redirect(url);
+    const next = internalRedirectPath(request.nextUrl.searchParams.get('next'));
+    return NextResponse.redirect(new URL(next, request.nextUrl.origin));
   }
 
   return response;

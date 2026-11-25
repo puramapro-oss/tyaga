@@ -8,6 +8,8 @@ import {
   USER_ACTIONS,
   type OrderStatus,
 } from '@/lib/order-transitions';
+import { isPhysicalPilotPolicy } from '@/lib/physical-fee-policy';
+import { hasPhysicalTestStripeKey } from '@/lib/physical-sale-pilot';
 import { rateLimit } from '@/lib/rate-limit';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
@@ -63,7 +65,7 @@ export async function POST(
   const { data: order } = await supabase
     .from('marketplace_orders')
     .select(
-      'id, buyer_id, seller_id, status, escrow_status, stripe_checkout_session_id'
+      'id, buyer_id, seller_id, status, escrow_status, stripe_checkout_session_id, fee_policy'
     )
     .eq('id', id)
     .maybeSingle();
@@ -80,6 +82,14 @@ export async function POST(
     );
   }
 
+  const pilot = isPhysicalPilotPolicy(order.fee_policy);
+  if (pilot && !hasPhysicalTestStripeKey()) {
+    return NextResponse.json({ error: 'Cette commande de test requiert le prestataire de recette.' }, { status: 503 });
+  }
+
+  // Capture the verified test client before any asynchronous state transition.
+  const pilotStripe = pilot ? getStripe() : null;
+
   // Rejouer `deliver` après un échec de finalisation : la commande est déjà
   // delivered/completed : la RPC sérialise la comptabilité et ne consomme
   // qu'un seul droit de virement. Une reprise rapproche uniquement le reçu.
@@ -88,7 +98,7 @@ export async function POST(
     (order.status === 'delivered' || order.status === 'completed')
   ) {
     try {
-      const settled = await settleOrder(order.id, user.id);
+      const settled = await settleOrder(order.id, user.id, pilotStripe);
       return NextResponse.json(settled, {
         status: settled.settlement.status === 'verification_required' ? 202 : 200,
       });
@@ -136,7 +146,7 @@ export async function POST(
   // `checkout.session.expired` est le filet de secours). Best-effort.
   if (to === 'cancelled' && order.status === 'pending' && order.stripe_checkout_session_id) {
     try {
-      await getStripe().checkout.sessions.expire(order.stripe_checkout_session_id);
+      await (pilotStripe ?? getStripe()).checkout.sessions.expire(order.stripe_checkout_session_id);
     } catch {
       // Session déjà payée/expirée : le webhook tranche l'état final.
     }
@@ -147,7 +157,7 @@ export async function POST(
   // à l'acheteur (il peut rejouer) au lieu de mentir avec un 200.
   if (to === 'delivered') {
     try {
-      const settled = await settleOrder(order.id, user.id);
+      const settled = await settleOrder(order.id, user.id, pilotStripe);
       return NextResponse.json(settled, {
         status: settled.settlement.status === 'verification_required' ? 202 : 200,
       });
@@ -166,9 +176,9 @@ export async function POST(
   return NextResponse.json({ order: updated });
 }
 
-function settleOrder(orderId: string, buyerId: string) {
+function settleOrder(orderId: string, buyerId: string, pilotStripe: ReturnType<typeof getStripe> | null) {
   return finalizeCompletedSale(orderId, buyerId, {
     store: createServiceClient(),
-    getTransfers: () => getStripe().transfers,
+    getTransfers: () => (pilotStripe ?? getStripe()).transfers,
   });
 }

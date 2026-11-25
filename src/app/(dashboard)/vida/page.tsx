@@ -69,6 +69,7 @@ export default async function VidaPage() {
       .select(
         'id, net_amount_cents, completed_at, order:marketplace_orders(item:items(title))'
       )
+      .eq('fee_policy', 'legacy')
       .order('completed_at', { ascending: false })
       .limit(20),
   ]);

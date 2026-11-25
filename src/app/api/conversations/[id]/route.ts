@@ -17,6 +17,8 @@ interface ThreadResponse {
     title: string;
     priceCents: number;
     floorCents: number | null;
+    negotiationEnabled: boolean;
+    isWanted: boolean;
   };
   messages: {
     id: string;
@@ -48,7 +50,7 @@ export async function GET(
     .from('conversations')
     .select(
       `id, buyer_id, seller_id,
-       annonces ( title, price_cents, items ( floor_price_cents ) )`
+       annonces ( title, price_cents, item_id, listing_intent, items ( floor_price_cents ) )`
     )
     .eq('id', id)
     .maybeSingle();
@@ -60,10 +62,11 @@ export async function GET(
     id: string;
     buyer_id: string;
     seller_id: string;
-    annonces: { title: string; price_cents: number; items: { floor_price_cents: number | null } | null } | null;
+    annonces: { title: string; price_cents: number; item_id: string | null; listing_intent: string; items: { floor_price_cents: number | null } | null } | null;
   };
   const role: InboxRole = row.buyer_id === user.id ? 'buyer' : 'seller';
   const priceCents = row.annonces?.price_cents ?? 0;
+  const negotiationEnabled = Boolean(row.annonces?.item_id);
   const floorCents = row.annonces?.items?.floor_price_cents ?? null;
 
   const { data: messages, error: msgError } = await supabase
@@ -106,6 +109,8 @@ export async function GET(
       title: row.annonces?.title ?? 'Annonce',
       priceCents,
       floorCents,
+      negotiationEnabled,
+      isWanted: row.annonces?.listing_intent === 'wanted',
     },
     messages: list.map((m) => ({
       id: m.id,
@@ -116,7 +121,7 @@ export async function GET(
       flagReason: m.flag_reason,
       createdAt: m.created_at,
     })),
-    suggestions: buildSuggestions({ role, priceCents, floorCents, lastOfferCents }),
+    suggestions: negotiationEnabled ? buildSuggestions({ role, priceCents, floorCents, lastOfferCents }) : [],
   };
   return NextResponse.json(payload);
 }

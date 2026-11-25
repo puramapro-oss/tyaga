@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import CommandeActions from '@/components/marketplace/CommandeActions';
 import PackingChecklist from '@/components/marketplace/PackingChecklist';
+import { isPhysicalPilotPolicy, physicalBuyerFeePercentLabel } from '@/lib/physical-fee-policy';
 import { orderPaymentLabel } from '@/lib/order-payment-label';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { formatDate, formatPrice } from '@/lib/utils';
@@ -24,6 +25,17 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Annulée',
 };
 
+interface SalePromotion {
+  order_id: string;
+  duration_hours: number;
+  redeem_until: string;
+  benefit_status: 'available' | 'active' | 'used' | 'expired' | 'revoked';
+}
+
+const PROMOTION_LABELS = {
+  available: 'Disponible', active: 'En cours de diffusion', used: 'Utilisé', expired: 'Expiré', revoked: 'Retiré',
+} as const;
+
 interface OrderRow {
   id: string;
   buyer_id: string;
@@ -32,6 +44,9 @@ interface OrderRow {
   escrow_status: string;
   stripe_transfer_id: string | null;
   amount_cents: number;
+  fee_policy: string;
+  item_amount_cents: number | null;
+  buyer_fee_cents: number | null;
   net_amount_cents: number;
   commission_amount_cents: number;
   shipping_address: Record<string, string> | null;
@@ -54,7 +69,7 @@ export default async function CommandesPage({
     .from('marketplace_orders')
     .select(
       `id, buyer_id, seller_id, status, escrow_status, stripe_transfer_id, amount_cents,
-       net_amount_cents, commission_amount_cents, shipping_address, created_at,
+       fee_policy, item_amount_cents, buyer_fee_cents, net_amount_cents, commission_amount_cents, shipping_address, created_at,
        annonces ( id, title )`
     )
     .order('created_at', { ascending: false })
@@ -65,6 +80,11 @@ export default async function CommandesPage({
     role: (user?.id === o.buyer_id ? 'buyer' : 'seller') as 'buyer' | 'seller',
   }));
 
+  const { data: promotions } = rows.length && user
+    ? await supabase.rpc('my_sale_promotions', { p_orders: rows.map(order => order.id) })
+    : { data: [] };
+  const promotionByOrder = new Map((promotions as SalePromotion[] | null ?? []).map(p => [p.order_id, p]));
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <div className="flex items-center gap-3">
@@ -74,9 +94,12 @@ export default async function CommandesPage({
 
       {paiement === 'ok' && (
         <p className="glass border-primary/40 p-4 text-sm text-foreground">
-          Paiement confirmé. Les fonds restent sous séquestre jusqu’à ta
-          confirmation de réception.
+          Le statut de ta commande indique si le paiement a été confirmé.
         </p>
+      )}
+
+      {paiement === 'retour-test' && (
+        <p className="glass p-4 text-sm">Retour de la recette Stripe. Le statut de la commande confirme le résultat du test.</p>
       )}
 
       {rows.length === 0 ? (
@@ -93,7 +116,9 @@ export default async function CommandesPage({
         </section>
       ) : (
         <ul className="flex flex-col gap-4">
-          {rows.map((o) => (
+          {rows.map((o) => {
+            const promotion = promotionByOrder.get(o.id);
+            return (
             <li key={o.id} className="glass flex flex-col gap-3 p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 {/* Pixel P6 : inline-flex min-h-11 — le lien titre ne faisait
@@ -113,6 +138,9 @@ export default async function CommandesPage({
               <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-foreground-secondary">
                 <span>{formatDate(o.created_at)}</span>
                 <span className="font-mono">{formatPrice(o.amount_cents)}</span>
+                {isPhysicalPilotPolicy(o.fee_policy) && o.item_amount_cents !== null && o.buyer_fee_cents !== null && (
+                  <span>Recette France · article {formatPrice(o.item_amount_cents)} · frais acheteur {formatPrice(o.buyer_fee_cents)} ({physicalBuyerFeePercentLabel(o.fee_policy)} % + 0,35 €)</span>
+                )}
                 {o.role === 'seller' && (
                   <span>
                     net vendeur{' '}
@@ -147,13 +175,21 @@ export default async function CommandesPage({
                 <PackingChecklist orderId={o.id} />
               )}
 
+              {promotion && (
+                <aside className="rounded-md border border-border p-3 text-sm">
+                  <strong>Avantage de cette transaction · {PROMOTION_LABELS[promotion.benefit_status]}</strong>
+                  <p>Mise en avant de {promotion.duration_hours} h pour une de tes annonces.</p>
+                  {promotion.benefit_status === 'available' && <p>À activer avant le {formatDate(promotion.redeem_until)} depuis ta fiche d’annonce. <Link className="link-nav" href="/marketplace">Ouvrir les annonces</Link></p>}
+                </aside>
+              )}
               <CommandeActions
                 orderId={o.id} status={o.status} role={o.role}
                 settlementPending={!o.stripe_transfer_id && o.net_amount_cents > 0
                   && o.escrow_status !== 'refunded'}
               />
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

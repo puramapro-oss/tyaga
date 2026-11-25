@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { internalRedirectPath } = (await import(
+const { authContinuationHref, internalRedirectPath } = (await import(
   new URL('../src/lib/auth-redirect.ts', import.meta.url).pathname
 )) as typeof import('../src/lib/auth-redirect');
 
@@ -53,4 +53,21 @@ test('la destination retournée reste interne après normalisation et reparsage'
       assert.equal(output.startsWith('//'), false);
     }
   }
+});
+
+
+test('le lien d’annonce et ses filtres survivent à la création de compte puis au retour OAuth ou e-mail', () => {
+  for (const destination of ['/marketplace/8f172b27-46df-41fa-a10e-f2d39079f0a1', '/marketplace?q=caf%C3%A9&sens=recherche#resultats']) {
+    let next: string | null = destination;
+    for (const step of ['/login', '/signup', '/callback'] as const) {
+      const url: URL = new URL(authContinuationHref(step, next), origin);
+      assert.equal(url.origin, origin);
+      assert.equal(url.pathname, step);
+      next = url.searchParams.get('next');
+      assert.equal(next, destination);
+    }
+    assert.equal(internalRedirectPath(next), destination);
+  }
+  assert.equal(authContinuationHref('/signup', null), '/signup');
+  assert.equal(authContinuationHref('/callback', 'https://outside.example/'), '/callback');
 });

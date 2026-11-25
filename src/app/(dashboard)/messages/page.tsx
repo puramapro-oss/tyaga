@@ -39,8 +39,7 @@ export default async function MessagesPage() {
       <div>
         <h1 className="font-display text-3xl">Messages</h1>
         <p className="mt-1 text-sm text-foreground-muted">
-          Toute la négociation se passe ici, sur TYAGA — paiement sécurisé,
-          vendeur payé après réception.
+          Retrouve tes échanges sur les offres et les recherches.
         </p>
       </div>
 
@@ -48,8 +47,7 @@ export default async function MessagesPage() {
         <section className="glass flex flex-col items-center gap-3 p-10 text-center">
           <MessageCircle size={24} className="text-foreground-muted" />
           <p className="text-sm leading-relaxed text-foreground-secondary">
-            Aucune conversation. Contacte un vendeur depuis la marketplace —
-            ou attends les questions sur tes annonces.
+            Pour démarrer une conversation, ouvre une annonce et contacte son auteur.
           </p>
           <Link
             href="/marketplace"
@@ -61,7 +59,7 @@ export default async function MessagesPage() {
       ) : (
         <ul className="glass flex flex-col divide-y divide-border" aria-label="Conversations">
           {conversations.map((c) => {
-            const isBuyer = c.buyer_id === user!.id;
+            const isInitiator = c.buyer_id === user!.id;
             return (
               <li key={c.id}>
                 <Link
@@ -76,7 +74,7 @@ export default async function MessagesPage() {
                       {c.annonces?.title ?? 'Annonce'}
                     </span>
                     <span className="block text-xs text-foreground-muted">
-                      {isBuyer ? 'Achat' : 'Vente'} · {formatDate(c.updated_at)}
+                      {isInitiator ? 'Ma prise de contact' : 'Mon annonce'} · {formatDate(c.updated_at)}
                     </span>
                   </span>
                   {c.annonces?.price_cents != null && (

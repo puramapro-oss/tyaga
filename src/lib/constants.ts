@@ -11,7 +11,9 @@ export const FISCAL_ALERT_NET_CENTS = 25000;
 
 /** Commission marketplace V1 (D13) — surchargée par TYAGA_COMMISSION_PCT. */
 export function commissionPct(): number {
-  const pct = Number(process.env.TYAGA_COMMISSION_PCT);
+  const configured = process.env.TYAGA_COMMISSION_PCT?.trim();
+  if (!configured) return 10;
+  const pct = Number(configured);
   return Number.isFinite(pct) && pct >= 0 && pct <= 30 ? pct : 10;
 }
 

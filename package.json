@@ -9,7 +9,8 @@
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test:unit": "node --conditions=react-server --import ./tests/ts-resolve.mjs --test tests/*.test.ts",
-    "test:settlement:sql": "node --experimental-vm-modules --conditions=react-server --import ./tests/ts-resolve.mjs --test --test-concurrency=1 tests/order-settlement.sql.mjs tests/order-transition-route.sql.mjs tests/order-refund.sql.mjs",
+    "test:settlement:sql": "node --liftoff-only --no-wasm-tier-up --experimental-vm-modules --conditions=react-server --import ./tests/ts-resolve.mjs --test --test-concurrency=1 tests/order-settlement.sql.mjs tests/order-transition-route.sql.mjs tests/order-refund.sql.mjs",
+    "test:member-marketplace": "node --test tests/member-marketplace.sql.mjs",
     "test:auth-callback": "node --experimental-vm-modules --test tests/auth-callback.test.mjs",
     "test:postgres-concurrency": "node --test --test-concurrency=1 tests/order-concurrency.postgres.mjs"
   },
