@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { computeCommission } from '@/lib/commission';
+import { sameSaleQuote } from '@/lib/physical-order-quote';
+import { expectedSaleQuote } from '@/lib/sale-quote-input';
 import { buildExportText } from '@/lib/listing';
 import { rateLimit } from '@/lib/rate-limit';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
@@ -13,6 +16,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 const bodySchema = z.object({
   itemId: z.string().uuid(),
+  expectedQuote: expectedSaleQuote,
   title: z.string().trim().min(3).max(70),
   description: z.string().trim().min(20).max(1200),
   tags: z.array(z.string().trim().min(2).max(24)).max(5),
@@ -92,6 +96,11 @@ export async function POST(request: Request) {
       { error: "Estime d'abord l'objet avant de publier." },
       { status: 400 }
     );
+  }
+
+  const quote = computeCommission(estimation.price_suggested_cents);
+  if (parsed.data.expectedQuote && !sameSaleQuote(parsed.data.expectedQuote, quote)) {
+    return NextResponse.json({ error: 'Le prix ou les frais ont changé. Régénère le brouillon avant publication.' }, { status: 409 });
   }
 
   // Une seule annonce publiée par objet

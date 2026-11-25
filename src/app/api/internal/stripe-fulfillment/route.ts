@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
+import { handleDigitalTestEvent } from '@/lib/digital-checkout-test';
 import { refundCompletedSale } from '@/lib/order-refund';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
@@ -33,6 +34,12 @@ export async function POST(request: Request) {
     );
   } catch {
     return NextResponse.json({ error: 'Signature invalide' }, { status: 400 });
+  }
+
+  try {
+    if (await handleDigitalTestEvent(event)) return NextResponse.json({ received: true });
+  } catch {
+    return NextResponse.json({ error: 'Rapprochement de la licence à réessayer.' }, { status: 503 });
   }
 
   // Défense (jury bugs P6) : karma ne doit nous envoyer QUE du tyaga. Un event

@@ -216,6 +216,20 @@ CREATE TABLE IF NOT EXISTS tyaga.vida_wallet (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS tyaga.vida_objectifs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
+  type text NOT NULL CHECK (type IN ('vida_subscription','soin','investissement','autre')),
+  label text NOT NULL,
+  target_points integer NOT NULL CHECK (target_points > 0),
+  current_points integer NOT NULL DEFAULT 0,
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_objectifs_user ON tyaga.vida_objectifs(user_id);
+
 CREATE TABLE IF NOT EXISTS tyaga.vida_transfers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
@@ -230,20 +244,6 @@ CREATE TABLE IF NOT EXISTS tyaga.vida_transfers (
 );
 
 CREATE INDEX IF NOT EXISTS idx_transfers_user ON tyaga.vida_transfers(user_id);
-
-CREATE TABLE IF NOT EXISTS tyaga.vida_objectifs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES tyaga.profiles(id) ON DELETE CASCADE,
-  type text NOT NULL CHECK (type IN ('vida_subscription','soin','investissement','autre')),
-  label text NOT NULL,
-  target_points integer NOT NULL CHECK (target_points > 0),
-  current_points integer NOT NULL DEFAULT 0,
-  active boolean NOT NULL DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_objectifs_user ON tyaga.vida_objectifs(user_id);
 
 -- ============ UNIVERSNELS (P3) ============
 CREATE TABLE IF NOT EXISTS tyaga.referrals (

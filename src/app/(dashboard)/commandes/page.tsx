@@ -24,6 +24,17 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Annulée',
 };
 
+interface SalePromotion {
+  order_id: string;
+  duration_hours: number;
+  redeem_until: string;
+  benefit_status: 'available' | 'active' | 'used' | 'expired' | 'revoked';
+}
+
+const PROMOTION_LABELS = {
+  available: 'Disponible', active: 'En cours de diffusion', used: 'Utilisé', expired: 'Expiré', revoked: 'Retiré',
+} as const;
+
 interface OrderRow {
   id: string;
   buyer_id: string;
@@ -65,6 +76,11 @@ export default async function CommandesPage({
     role: (user?.id === o.buyer_id ? 'buyer' : 'seller') as 'buyer' | 'seller',
   }));
 
+  const { data: promotions } = rows.length && user
+    ? await supabase.rpc('my_sale_promotions', { p_orders: rows.map(order => order.id) })
+    : { data: [] };
+  const promotionByOrder = new Map((promotions as SalePromotion[] | null ?? []).map(p => [p.order_id, p]));
+
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
       <div className="flex items-center gap-3">
@@ -93,7 +109,9 @@ export default async function CommandesPage({
         </section>
       ) : (
         <ul className="flex flex-col gap-4">
-          {rows.map((o) => (
+          {rows.map((o) => {
+            const promotion = promotionByOrder.get(o.id);
+            return (
             <li key={o.id} className="glass flex flex-col gap-3 p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 {/* Pixel P6 : inline-flex min-h-11 — le lien titre ne faisait
@@ -147,13 +165,21 @@ export default async function CommandesPage({
                 <PackingChecklist orderId={o.id} />
               )}
 
+              {promotion && (
+                <aside className="rounded-md border border-border p-3 text-sm">
+                  <strong>Avantage de cette transaction · {PROMOTION_LABELS[promotion.benefit_status]}</strong>
+                  <p>Mise en avant de {promotion.duration_hours} h pour une de tes annonces.</p>
+                  {promotion.benefit_status === 'available' && <p>À activer avant le {formatDate(promotion.redeem_until)} depuis ta fiche d’annonce. <Link className="link-nav" href="/marketplace">Ouvrir les annonces</Link></p>}
+                </aside>
+              )}
               <CommandeActions
                 orderId={o.id} status={o.status} role={o.role}
                 settlementPending={!o.stripe_transfer_id && o.net_amount_cents > 0
                   && o.escrow_status !== 'refunded'}
               />
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

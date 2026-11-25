@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { marketplaceLoginReturn } from '@/lib/marketplace-filters';
+
 const PUBLIC_PATHS = [
   '/',
   '/login',
@@ -63,7 +65,9 @@ export async function middleware(request: NextRequest) {
   if (!isPublic(pathname) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    url.searchParams.set('next', pathname);
+    url.search = '';
+    const returnPath = pathname === '/marketplace' ? marketplaceLoginReturn(request.nextUrl.searchParams) : pathname;
+    url.searchParams.set('next', returnPath);
     return NextResponse.redirect(url);
   }
 

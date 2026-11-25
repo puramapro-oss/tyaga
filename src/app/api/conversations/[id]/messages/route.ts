@@ -43,7 +43,7 @@ export async function POST(
   // RLS convs_select : participant uniquement → 404 sinon
   const { data: conv } = await supabase
     .from('conversations')
-    .select('id, buyer_id, seller_id')
+    .select('id, buyer_id, seller_id, annonces(item_id)')
     .eq('id', id)
     .maybeSingle();
   if (!conv) {
@@ -67,6 +67,10 @@ export async function POST(
   // Offre chiffrée : l'acheteur propose (EX-D) ; le vendeur ne peut en poser
   // une QUE pour ACCEPTER la dernière offre acheteur en cours, au montant
   // exact — la contre-offre vendeur passe par les suggestions (≥ plancher, EX-F3).
+  const listing = conv.annonces as unknown as { item_id: string | null } | null;
+  if (parsed.data.offerCents != null && !listing?.item_id) {
+    return NextResponse.json({ error: 'Échange par message sur les conditions de cette annonce.' }, { status: 400 });
+  }
   let offerCents: number | null = null;
   if (conv.buyer_id === user.id) {
     offerCents = parsed.data.offerCents ?? null;
@@ -125,7 +129,7 @@ export async function POST(
   if (offPlatform) {
     return NextResponse.json(
       {
-        error: `Message bloqué : ${offPlatform.fr} détecté. Paiement ou contact hors plateforme interdit — tout se passe sur TYAGA (paiement sécurisé, vendeur payé après réception).`,
+        error: `Message bloqué : ${offPlatform.fr} détecté. Garde les coordonnées et les paiements hors de la conversation.`,
         flagged: true,
         message,
       },
