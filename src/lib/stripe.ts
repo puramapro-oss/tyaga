@@ -8,11 +8,13 @@ import Stripe from 'stripe';
  */
 
 let client: Stripe | null = null;
+let currentKey: string | undefined;
 
 export function getStripe(): Stripe {
-  if (!client) {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) throw new Error('STRIPE_SECRET_KEY manquante');
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY manquante');
+  if (!client || key !== currentKey) {
+    currentKey = key;
     client = new Stripe(key, { apiVersion: '2026-07-29.dahlia' });
   }
   return client;

@@ -31,3 +31,33 @@ test('la confirmation porte sur le prix, le taux, les frais et le net', () => {
     assert.equal(sameSaleQuote(quote, { ...quote, [key]: quote[key] + 1 }), false);
   }
 });
+
+test('pilote EUR : frais acheteur arrondis au centime, aucun frais vendeur, anciens devis distincts', async () => {
+  const { physicalPilotQuote } = await import('../src/lib/commission');
+  assert.deepEqual(physicalPilotQuote(2500), {
+    policy: 'fr_p2p_test_v2', itemCents: 2500, buyerFeeCents: 108,
+    grossCents: 2608, commissionPct: 0, commissionCents: 0, netCents: 2500,
+  });
+  assert.equal(physicalPilotQuote(2499)?.buyerFeeCents, 107);
+  assert.equal(physicalPilotQuote(2501)?.buyerFeeCents, 108);
+  assert.equal(physicalPilotQuote(14), null);
+  assert.equal(physicalPilotQuote(15)?.grossCents, 50);
+  assert.equal(physicalPilotQuote(2_147_483_647), null);
+  const pilot = physicalPilotQuote(1000)!;
+  assert.equal(sameSaleQuote(pilot, { ...pilot, buyerFeeCents: 0 }), false);
+  assert.equal(sameSaleQuote(pilot, { ...pilot, policy: undefined }), false);
+});
+
+test('une configuration historique vide conserve le défaut ; zéro explicite reste valable', async () => {
+  const { commissionPct } = await import('../src/lib/constants');
+  const original = process.env.TYAGA_COMMISSION_PCT;
+  try {
+    process.env.TYAGA_COMMISSION_PCT = '   ';
+    assert.equal(commissionPct(), 10);
+    process.env.TYAGA_COMMISSION_PCT = '0';
+    assert.equal(commissionPct(), 0);
+  } finally {
+    if (original === undefined) delete process.env.TYAGA_COMMISSION_PCT;
+    else process.env.TYAGA_COMMISSION_PCT = original;
+  }
+});

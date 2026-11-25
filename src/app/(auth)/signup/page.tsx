@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
 import AuthShell from '@/components/auth/AuthShell';
@@ -12,6 +12,7 @@ import {
   PasswordField,
   SubmitButton,
 } from '@/components/auth/AuthFields';
+import { authContinuationHref, internalRedirectPath } from '@/lib/auth-redirect';
 import { createClient } from '@/lib/supabase';
 import { REFERRAL_STORAGE_KEY } from '@/lib/referral';
 
@@ -25,6 +26,8 @@ function SignupForm() {
   const [viaReferral, setViaReferral] = useState(false);
   const supabase = createClient();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const next = internalRedirectPath(searchParams.get('next'));
 
   // Parrainage : le lien d'invitation survit à la confirmation email et à
   // l'OAuth Google (redirections) via sessionStorage — le dashboard consomme.
@@ -52,11 +55,11 @@ function SignupForm() {
       return;
     }
     setLoading(true);
-    const { error: authError } = await supabase.auth.signUp({
+    const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/callback`,
+        emailRedirectTo: window.location.origin + authContinuationHref('/callback', next),
       },
     });
     setLoading(false);
@@ -68,6 +71,11 @@ function SignupForm() {
       );
       return;
     }
+    if (data?.session && data.user?.id) {
+      router.replace(next);
+      router.refresh();
+      return;
+    }
     setSent(true);
   }
 
@@ -75,7 +83,7 @@ function SignupForm() {
     setError(null);
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/callback` },
+      options: { redirectTo: window.location.origin + authContinuationHref('/callback', next) },
     });
   }
 
@@ -86,7 +94,7 @@ function SignupForm() {
         subtitle={`Un lien de confirmation vient d'être envoyé à ${email}. Ouvre-le pour activer ton compte.`}
       >
         <Link
-          href="/login"
+          href={authContinuationHref('/login', next)}
           className="link-nav flex h-12 items-center justify-center rounded-pill border border-border-control font-medium"
         >
           Retour à la connexion
@@ -140,7 +148,7 @@ function SignupForm() {
       </p>
       <p className="text-center text-sm text-foreground-secondary">
         Déjà un compte ?{' '}
-        <Link href="/login" className="link-action">
+        <Link href={authContinuationHref('/login', next)} className="link-action">
           Se connecter
         </Link>
       </p>

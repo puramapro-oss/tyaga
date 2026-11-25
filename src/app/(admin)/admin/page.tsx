@@ -78,11 +78,13 @@ export default async function AdminPage() {
         // colonne inexistante fait échouer TOUTE la requête (table muette).
         'id,annonce_id,buyer_id,seller_id,amount_cents,commission_amount_cents,net_amount_cents,status,escrow_status,created_at'
       )
+      .eq('fee_policy', 'legacy')
       .order('created_at', { ascending: false })
       .limit(10),
     service
       .from('ventes')
       .select('id,order_id,net_amount_cents,fiscal_year,completed_at')
+      .eq('fee_policy', 'legacy')
       .order('completed_at', { ascending: false })
       .limit(5),
     service
@@ -100,8 +102,8 @@ export default async function AdminPage() {
 
   const [profilesCount, ordersCount, ventesCount, flaggedCount] = await Promise.all([
     service.from('profiles').select('id', { count: 'exact', head: true }),
-    service.from('marketplace_orders').select('id', { count: 'exact', head: true }),
-    service.from('ventes').select('id', { count: 'exact', head: true }),
+    service.from('marketplace_orders').select('id', { count: 'exact', head: true }).eq('fee_policy', 'legacy'),
+    service.from('ventes').select('id', { count: 'exact', head: true }).eq('fee_policy', 'legacy'),
     service
       .from('inbox_messages')
       .select('id', { count: 'exact', head: true })

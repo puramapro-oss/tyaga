@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
+import { createPhysicalPilotCheckout } from '@/lib/physical-pilot-checkout';
+import { PHYSICAL_PILOT_POLICY } from '@/lib/physical-sale-pilot';
 import { physicalOrderQuote, sameSaleQuote } from '@/lib/physical-order-quote';
 import { expectedSaleQuote } from '@/lib/sale-quote-input';
 import { rateLimit } from '@/lib/rate-limit';
@@ -67,7 +69,7 @@ export async function POST(request: Request) {
   // Annonce publiée uniquement (RLS annonces_select)
   const { data: annonce } = await supabase
     .from('annonces')
-    .select('id, item_id, user_id, title, price_cents, status')
+    .select('id, item_id, user_id, title, price_cents, status, fee_policy')
     .eq('id', annonceId)
     .eq('status', 'published')
     .maybeSingle();
@@ -89,6 +91,19 @@ export async function POST(request: Request) {
     );
   }
 
+  const quote = await physicalOrderQuote(supabase, annonce, user.id);
+  if (!quote) {
+    return NextResponse.json({ error: 'Impossible de vérifier le prix convenu. Réessaie.' }, { status: 503 });
+  }
+  const pilot = annonce.fee_policy === PHYSICAL_PILOT_POLICY;
+  if ((pilot && !parsed.data.expectedQuote) || (parsed.data.expectedQuote && !sameSaleQuote(parsed.data.expectedQuote, quote))) {
+    return NextResponse.json({
+      error: 'Les montants ont changé. Vérifie le nouveau détail avant de confirmer.',
+      quote,
+    }, { status: 409 });
+  }
+  if (pilot) return createPhysicalPilotCheckout(supabase, annonce, user.id, quote, shippingAddress);
+
   // Une seule commande active par annonce
   const { count: activeCount } = await supabase
     .from('marketplace_orders')
@@ -102,16 +117,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const quote = await physicalOrderQuote(supabase, annonce, user.id);
-  if (!quote) {
-    return NextResponse.json({ error: 'Impossible de vérifier le prix convenu. Réessaie.' }, { status: 503 });
-  }
-  if (parsed.data.expectedQuote && !sameSaleQuote(parsed.data.expectedQuote, quote)) {
-    return NextResponse.json({
-      error: 'Les montants ont changé. Vérifie le nouveau détail avant de confirmer.',
-      quote,
-    }, { status: 409 });
-  }
   const { grossCents, commissionPct, commissionCents, netCents } = quote;
 
   // RLS orders_insert : buyer + status pending ✓
@@ -133,7 +138,7 @@ export async function POST(request: Request) {
     .select('id')
     .single();
 
-  if (orderError?.code === '23505' || !order) {
+  if (orderError?.code === '23505') {
     // idx_orders_annonce_active : un autre acheteur est passé entre le count
     // et l'insert (fenêtre TOCTOU fermée par l'index unique partiel).
     return NextResponse.json(
@@ -141,7 +146,7 @@ export async function POST(request: Request) {
       { status: 409 }
     );
   }
-  if (orderError) {
+  if (orderError || !order) {
     return NextResponse.json(
       { error: 'Commande impossible. Réessaie dans un instant.' },
       { status: 500 }

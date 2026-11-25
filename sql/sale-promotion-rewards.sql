@@ -36,7 +36,8 @@ DECLARE
   issued timestamptz := statement_timestamp();
 BEGIN
   SELECT * INTO o FROM tyaga.marketplace_orders WHERE id=p_order FOR UPDATE;
-  IF NOT FOUND OR o.status <> 'completed' OR o.escrow_status <> 'released'
+  IF NOT FOUND OR to_jsonb(o)->>'fee_policy'='fr_p2p_test_v2'
+    OR o.status <> 'completed' OR o.escrow_status <> 'released'
     OR nullif(o.stripe_payment_intent_id,'') IS NULL OR nullif(o.stripe_transfer_id,'') IS NULL
     THEN RETURN false; END IF;
   IF NOT EXISTS (

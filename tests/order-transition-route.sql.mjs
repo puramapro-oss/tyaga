@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { database, ids, storeFor, transfersFor } from './settlement-db.mjs';
 import { finalizeCompletedSale } from '../src/lib/order-settlement.ts';
+import { PHYSICAL_PILOT_POLICY } from '../src/lib/physical-sale-pilot.ts';
 import * as transitions from '../src/lib/order-transitions.ts';
 
 const require = createRequire(import.meta.url);
@@ -18,6 +19,8 @@ const source = ts.transpileModule(await readFile(new URL('../src/app/api/orders/
 async function app(t, options = {}) {
   const db = await database({ status: 'shipped', ...options });
   t.after(() => db.close());
+  await db.exec("ALTER TABLE tyaga.marketplace_orders ADD COLUMN fee_policy text NOT NULL DEFAULT 'legacy'");
+  if (options.pilot) await db.query('UPDATE tyaga.marketplace_orders SET fee_policy=$1',[PHYSICAL_PILOT_POLICY]);
   const start = originalSchema.indexOf('DROP POLICY IF EXISTS orders_select');
   const end = originalSchema.indexOf('-- VENTES :', start);
   const freezeStart = originalSchema.indexOf('CREATE OR REPLACE FUNCTION tyaga.tg_orders_freeze()');
@@ -66,11 +69,14 @@ async function app(t, options = {}) {
     'next/server': { NextResponse }, zod: require('zod'),
     '@/lib/order-settlement': { finalizeCompletedSale },
     '@/lib/order-transitions': transitions,
+    '@/lib/physical-sale-pilot': { PHYSICAL_PILOT_POLICY, hasPhysicalTestStripeKey: () => options.testKey === true },
     '@/lib/rate-limit': { rateLimit: () => ({ ok: !options.rateLimited, retryAfterSec: 60 }) },
     '@/lib/service': { createServiceClient: () => { calls.service++; return store; } },
     '@/lib/supabase-server': { createServerSupabaseClient: async () => authClient },
-    '@/lib/stripe': { getStripe: () => ({ transfers: gateway.getTransfers(),
-      checkout: { sessions: { async expire() { calls.expire++; } } } }) },
+    '@/lib/stripe': { getStripe: () => {
+      if (options.forbidChangedClient && !options.testKey) throw new Error('A live client was requested');
+      return { transfers: gateway.getTransfers(), checkout: { sessions: { async expire() { calls.expire++; } } } };
+    } },
   };
   const context = vm.createContext({ console: { error() {} }, Date, URL });
   const module = new vm.SourceTextModule(source, { context });
@@ -148,4 +154,24 @@ test('seller shipping keeps its existing path and performs no finalization', asy
   const response = await a.post('ship');
   assert.equal(response.status, 200); assert.equal(response.body.order.status, 'shipped');
   assert.equal(a.calls.service, 0); assert.equal(a.gateway.calls.creates.length, 0);
+});
+
+
+for (const [action,status] of [['cancel','pending'], ['deliver','shipped'], ['deliver','delivered'], ['deliver','completed']]) {
+  test(`une commande pilote ne peut pas ${action} depuis ${status} sous une clé de production`, async t => {
+    const a = await app(t, { pilot: true, testKey: false, status });
+    await a.db.exec("UPDATE tyaga.marketplace_orders SET stripe_checkout_session_id='cs_test_order'");
+    assert.equal((await a.post(action)).status,503);
+    assert.equal((await a.db.query('SELECT status FROM tyaga.marketplace_orders')).rows[0].status, status);
+    assert.equal(a.calls.service,0); assert.equal(a.calls.expire,0); assert.equal(a.gateway.calls.creates.length,0);
+  });
+}
+
+
+test('la transition conserve le client de recette vérifié avant une bascule de clé en vol', async t => {
+  const options = { pilot:true, testKey:true, forbidChangedClient:true, beforeUpdate:() => { options.testKey=false; } };
+  const a=await app(t,options);
+  assert.equal((await a.post('deliver')).status,200);
+  assert.equal(options.testKey,false);
+  assert.equal(a.gateway.calls.creates.length,1);
 });

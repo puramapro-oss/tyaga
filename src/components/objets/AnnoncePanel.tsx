@@ -18,6 +18,7 @@ interface ListingDraft {
   description: string;
   tags: string[];
   quote: CommissionBreakdown;
+  pilotQuote?: CommissionBreakdown | null;
 }
 
 export default function AnnoncePanel({
@@ -31,6 +32,8 @@ export default function AnnoncePanel({
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState<ListingDraft | null>(null);
+  const [pilot, setPilot] = useState(false);
+  const selectedQuote = pilot && draft?.pilotQuote ? draft.pilotQuote : draft?.quote;
   const [loading, setLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [validated, setValidated] = useState(false); // EX-D2 : action utilisateur
@@ -40,12 +43,14 @@ export default function AnnoncePanel({
   useEffect(() => {
     // reset si l'objet change (navigation client)
     setDraft(null);
+    setPilot(false);
     setValidated(false);
     setError(null);
     setCopied(false);
   }, [itemId]);
 
   async function generate() {
+    setPilot(false);
     setLoading(true);
     setError(null);
     setValidated(false);
@@ -70,7 +75,7 @@ export default function AnnoncePanel({
   }
 
   async function publish() {
-    if (!draft || !validated || publishing || loading) return; // EX-D2 : garde double (UI + serveur)
+    if (!draft || !selectedQuote || !validated || publishing || loading) return; // EX-D2 : garde double (UI + serveur)
     setPublishing(true);
     setError(null);
     try {
@@ -82,7 +87,8 @@ export default function AnnoncePanel({
           title: draft.title,
           description: draft.description,
           tags: draft.tags,
-          expectedQuote: draft.quote,
+          expectedQuote: selectedQuote,
+          ...(selectedQuote.policy === 'fr_p2p_test_v2' ? { feePolicy: selectedQuote.policy } : {}),
           userValidated: true, // la case cochée est la seule voie vers true
         }),
         signal: AbortSignal.timeout(30_000),
@@ -170,7 +176,7 @@ export default function AnnoncePanel({
   }
 
   // ---- Brouillon IA : montré AVANT publication (EX-D1) ----
-  if (draft) {
+  if (draft && selectedQuote) {
     return (
       <section className="glass flex flex-col gap-5 p-6" aria-label="Brouillon d'annonce">
         <div className="flex items-center justify-between gap-4">
@@ -204,7 +210,21 @@ export default function AnnoncePanel({
               </span>
             ))}
           </div>
-          <SaleFeeSummary quote={draft.quote} />
+          {draft.pilotQuote && (
+            <label className="grid gap-1.5 text-sm">
+              Tarif de cette annonce
+              <select
+                value={pilot ? 'pilot' : 'standard'}
+                disabled={loading || publishing}
+                onChange={event => { setPilot(event.target.value === 'pilot'); setValidated(false); }}
+                className="min-h-11 w-full rounded-md border border-border-control bg-background-soft px-3"
+              >
+                <option value="standard">Tarif habituel</option>
+                <option value="pilot">Tarif de test entre particuliers en France</option>
+              </select>
+            </label>
+          )}
+          <SaleFeeSummary quote={selectedQuote} />
         </div>
 
         {/* EX-D2 : validation explicite, bouton inactif sans elle */}

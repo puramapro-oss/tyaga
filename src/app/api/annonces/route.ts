@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { computeCommission } from '@/lib/commission';
+import { computeCommission, physicalPilotQuote } from '@/lib/commission';
 import { sameSaleQuote } from '@/lib/physical-order-quote';
+import { canUsePhysicalSalePilot, PHYSICAL_PILOT_POLICY } from '@/lib/physical-sale-pilot';
 import { expectedSaleQuote } from '@/lib/sale-quote-input';
 import { buildExportText } from '@/lib/listing';
 import { rateLimit } from '@/lib/rate-limit';
@@ -17,6 +18,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 const bodySchema = z.object({
   itemId: z.string().uuid(),
   expectedQuote: expectedSaleQuote,
+  feePolicy: z.enum(['legacy', PHYSICAL_PILOT_POLICY]).optional(),
   title: z.string().trim().min(3).max(70),
   description: z.string().trim().min(20).max(1200),
   tags: z.array(z.string().trim().min(2).max(24)).max(5),
@@ -98,8 +100,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const quote = computeCommission(estimation.price_suggested_cents);
-  if (parsed.data.expectedQuote && !sameSaleQuote(parsed.data.expectedQuote, quote)) {
+  const pilot = parsed.data.feePolicy === PHYSICAL_PILOT_POLICY;
+  if (pilot && !(await canUsePhysicalSalePilot(supabase))) {
+    return NextResponse.json({ error: 'Ce compte ne peut pas publier au tarif de recette.' }, { status: 403 });
+  }
+  const quote = pilot ? physicalPilotQuote(estimation.price_suggested_cents) : computeCommission(estimation.price_suggested_cents);
+  if (!quote || (pilot && !parsed.data.expectedQuote) ||
+      (parsed.data.expectedQuote && !sameSaleQuote(parsed.data.expectedQuote, quote))) {
     return NextResponse.json({ error: 'Le prix ou les frais ont changé. Régénère le brouillon avant publication.' }, { status: 409 });
   }
 
@@ -130,6 +137,7 @@ export async function POST(request: Request) {
     .from('annonces')
     .insert({
       item_id: item.id,
+      ...(pilot ? { fee_policy: PHYSICAL_PILOT_POLICY } : {}),
       user_id: user.id,
       estimation_id: estimation.id,
       title,

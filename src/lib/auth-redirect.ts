@@ -26,3 +26,9 @@ export function internalRedirectPath(rawNext: string | null): string {
     return FALLBACK;
   }
 }
+
+/** Carry the same internal destination through login, signup and the callback. */
+export function authContinuationHref(page: '/login' | '/signup' | '/callback', rawNext: string | null) {
+  const next = internalRedirectPath(rawNext);
+  return next === FALLBACK ? page : page + '?' + new URLSearchParams({ next }).toString();
+}

@@ -43,6 +43,9 @@ interface OrderRow {
   escrow_status: string;
   stripe_transfer_id: string | null;
   amount_cents: number;
+  fee_policy: string;
+  item_amount_cents: number | null;
+  buyer_fee_cents: number | null;
   net_amount_cents: number;
   commission_amount_cents: number;
   shipping_address: Record<string, string> | null;
@@ -65,7 +68,7 @@ export default async function CommandesPage({
     .from('marketplace_orders')
     .select(
       `id, buyer_id, seller_id, status, escrow_status, stripe_transfer_id, amount_cents,
-       net_amount_cents, commission_amount_cents, shipping_address, created_at,
+       fee_policy, item_amount_cents, buyer_fee_cents, net_amount_cents, commission_amount_cents, shipping_address, created_at,
        annonces ( id, title )`
     )
     .order('created_at', { ascending: false })
@@ -90,9 +93,12 @@ export default async function CommandesPage({
 
       {paiement === 'ok' && (
         <p className="glass border-primary/40 p-4 text-sm text-foreground">
-          Paiement confirmé. Les fonds restent sous séquestre jusqu’à ta
-          confirmation de réception.
+          Le statut de ta commande indique si le paiement a été confirmé.
         </p>
+      )}
+
+      {paiement === 'retour-test' && (
+        <p className="glass p-4 text-sm">Retour de la recette Stripe. Le statut de la commande confirme le résultat du test.</p>
       )}
 
       {rows.length === 0 ? (
@@ -131,6 +137,9 @@ export default async function CommandesPage({
               <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-foreground-secondary">
                 <span>{formatDate(o.created_at)}</span>
                 <span className="font-mono">{formatPrice(o.amount_cents)}</span>
+                {o.fee_policy === 'fr_p2p_test_v2' && o.item_amount_cents !== null && o.buyer_fee_cents !== null && (
+                  <span>Recette France · article {formatPrice(o.item_amount_cents)} · frais acheteur {formatPrice(o.buyer_fee_cents)}</span>
+                )}
                 {o.role === 'seller' && (
                   <span>
                     net vendeur{' '}

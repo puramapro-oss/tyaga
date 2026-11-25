@@ -5,13 +5,15 @@ import { notFound } from 'next/navigation';
 import ContactButton from '@/components/inbox/ContactButton';
 import BuyPanel from '@/components/marketplace/BuyPanel';
 import SaleFeeSummary from '@/components/marketplace/SaleFeeSummary';
-import { computeCommission } from '@/lib/commission';
+import { canUsePhysicalSalePilot, PHYSICAL_PILOT_POLICY } from '@/lib/physical-sale-pilot';
+import { computeCommission, physicalPilotQuote } from '@/lib/commission';
 import { physicalOrderQuote } from '@/lib/physical-order-quote';
 import DigitalLicensePanel from '@/components/marketplace/DigitalLicensePanel';
 import ListingMatches from '@/components/marketplace/ListingMatches';
 import { listingPhotoName } from '@/components/marketplace/listingPhotos';
 import ListingPromotionQuote from '@/components/marketplace/ListingPromotionQuote';
 import ShareListing from '@/components/marketplace/ShareListing';
+import { PublicListingPreview } from '@/components/marketplace/PublicListingPreview';
 import { CONDITION_LABELS } from '@/lib/labels';
 import { createServiceClient } from '@/lib/service';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
@@ -35,6 +37,7 @@ interface AnnonceRow {
   tags: string[];
   price_cents: number;
   published_at: string;
+  fee_policy: string;
   asset_kind: 'physical' | 'digital';
   listing_intent: 'offer' | 'wanted';
   listing_mode: 'sale' | 'rental';
@@ -67,7 +70,7 @@ export default async function AnnoncePage({
       .from('annonces')
       .select(
         `id, user_id, item_id, title, description, tags, price_cents, published_at,
-         asset_kind, listing_intent, listing_mode, digital_format, digital_license_terms,
+         asset_kind, listing_intent, listing_mode, fee_policy, digital_format, digital_license_terms,
          digital_license_days, digital_rights_attested,
          items ( category, brand, model, condition, item_photos ( storage_path, position ) )`
       )
@@ -89,8 +92,11 @@ export default async function AnnoncePage({
   const wanted = row.listing_intent === 'wanted';
   const rental = row.listing_mode === 'rental';
   const physicalCheckout = row.asset_kind === 'physical' && row.listing_intent === 'offer' && row.listing_mode === 'sale';
-  const quote = physicalCheckout && user
-    ? (isOwner ? computeCommission(row.price_cents) : await physicalOrderQuote(supabase, row, user.id))
+  const pilot = row.fee_policy === PHYSICAL_PILOT_POLICY;
+  const pilotAvailable = !pilot || await canUsePhysicalSalePilot(supabase);
+  const quote = physicalCheckout && user && pilotAvailable
+    ? (isOwner ? (pilot ? physicalPilotQuote(row.price_cents) : computeCommission(row.price_cents))
+      : await physicalOrderQuote(supabase, row, user.id))
     : null;
   const related = new URLSearchParams({ kind: row.asset_kind, mode: row.listing_mode, intent: wanted ? 'offer' : 'wanted' });
   if (row.digital_format) related.set('format', row.digital_format);
@@ -130,6 +136,7 @@ export default async function AnnoncePage({
       </div>
 
       <ShareListing id={row.id} title={row.title} />
+      {isOwner && <PublicListingPreview id={row.id} title={row.title} priceCents={row.price_cents} kind={row.asset_kind} intent={row.listing_intent} mode={row.listing_mode} />}
 
       {photoUrls.some((p) => p.url) && (
         <div className="grid grid-cols-3 gap-3">
@@ -194,7 +201,8 @@ export default async function AnnoncePage({
       ) : (
         <div className="flex flex-col gap-3">
           {physicalCheckout && (quote ? <BuyPanel annonceId={row.id} quote={quote} /> :
-            <p role="alert">Le prix convenu ne peut pas être vérifié pour le moment. Réessaie dans un instant.</p>)}
+            <p role="alert">{pilot && !pilotAvailable ? 'Cette vente est réservée aux participants de la recette française.'
+              : 'Le prix convenu ne peut pas être vérifié pour le moment. Réessaie dans un instant.'}</p>)}
           {/* EX-F1 : messagerie interne — la question AVANT l'achat */}
           <ContactButton annonceId={annonce.id} />
         </div>

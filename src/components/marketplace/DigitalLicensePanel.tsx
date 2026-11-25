@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useId, useState } from 'react';
 
+import LicensedFile from '@/components/marketplace/LicensedFile';
+
 type License =
   | { state: 'attach' | 'sample_attach' | 'sample_owner' | 'sample_missing' | 'owner' | 'missing' | 'paid' | 'revoked'; text?: string }
   | { state: 'available' | 'sample_available'; version: string; terms: string; days: number | null }
@@ -16,6 +18,7 @@ export default function DigitalLicensePanel({ annonceId, isOwner, priceCents }: 
   const [license, setLicense] = useState<ResponseState | null>(null);
   const [error, setError] = useState('');
   const [text, setText] = useState('');
+  const [medium, setMedium] = useState<'text' | 'file'>('text');
   const [agreed, setAgreed] = useState(false);
   const [working, setWorking] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -108,10 +111,20 @@ export default function DigitalLicensePanel({ annonceId, isOwner, priceCents }: 
 
   const accessible = license?.state === 'owner' || license?.state === 'active';
   return <section className="glass flex flex-col gap-3 p-5" aria-labelledby={heading}>
-    <h2 id={heading} className="font-display text-xl">Lecture de la création</h2>
+    <h2 id={heading} className="font-display text-xl">Accès à la création</h2>
     {error && <p role="alert">{error} <button className={buttonClass} onClick={() => setRevision(value => value + 1)}>Actualiser</button></p>}
     {!license && !error && <p role="status">Vérification de l’accès…</p>}
     {(license?.state === 'attach' || license?.state === 'sample_attach') && isOwner && <>
+      <label className="grid gap-1 text-sm">Support de la création
+        <select value={medium} disabled={working}
+          onChange={event => { setMedium(event.target.value === 'file' ? 'file' : 'text'); setAgreed(false); }}
+          className="min-h-11 rounded-md border border-border-control bg-background-soft px-3">
+          <option value="text">Texte</option><option value="file">Fichier</option>
+        </select>
+      </label>
+      {medium === 'file' ? <LicensedFile endpoint={url + '/fichier'} id={annonceId} state={license.state}
+        revision={revision} upload={license.state === 'sample_attach' ? 'test-sample' : 'free'} onBusy={setWorking}
+        afterUpload={() => { setLicense(null); setRevision(value => value + 1); }} /> : <>
       <label>Texte intégral de ta création
         <textarea className="mt-1 block min-h-32 w-full rounded-lg border border-border-control bg-background p-2" maxLength={32000}
           value={text} onChange={event => setText(event.target.value)} />
@@ -119,22 +132,27 @@ export default function DigitalLicensePanel({ annonceId, isOwner, priceCents }: 
       <p className="text-sm">{license.state === 'sample_attach' ? 'Recette Stripe. Joins uniquement un échantillon destiné aux testeurs. Aucun paiement réel.' : 'Une fois joint, ce texte est définitif et cette offre reste gratuite.'}</p>
       <label><input type="checkbox" checked={agreed} onChange={event => setAgreed(event.target.checked)} /> {license.state === 'sample_attach' ? 'J’autorise les testeurs à lire cet échantillon après un paiement fictif.' : 'Je dispose des droits pour distribuer ce texte aux conditions de l’annonce.'}</label>
       <button className={buttonClass} disabled={working || !agreed || !text.trim()} onClick={save}>Joindre le texte</button>
+      </>}
     </>}
     {license?.state === 'sample_owner' && <p>Ton échantillon est joint. Un autre compte de recette peut essayer son accès avec une carte Stripe de test.</p>}
     {license?.state === 'sample_missing' && <p>Le créateur n’a pas encore joint d’échantillon pour la recette.</p>}
-    {license?.state === 'missing' && <p>L’auteur n’a pas encore joint son texte.</p>}
+    {license?.state === 'missing' && <p>L’auteur n’a pas encore joint sa création.</p>}
     {license?.state === 'paid' && <p>Le paiement et la délivrance de cette licence sont indisponibles.</p>}
     {(license?.state === 'available' || license?.state === 'sample_available') && <>
       <p>{license.state === 'sample_available' ? 'Recette Stripe Connect. Utilise uniquement une carte de test. Aucun débit réel.' : license.days === null ? 'Accès gratuit sans échéance.' : `Accès gratuit pendant ${license.days} jour(s) dès l’activation.`}</p>
+      <LicensedFile endpoint={url + '/fichier'} id={annonceId} state={license.state} revision={revision} />
       <p className="whitespace-pre-wrap break-words">{license.terms}</p>
+      <p className="text-sm">Si la création est un fichier, tu peux le télécharger pendant la licence. Une copie téléchargée peut rester sur ton appareil après son expiration. Les conditions d’usage continuent de s’appliquer.</p>
       <label><input type="checkbox" checked={agreed} onChange={event => setAgreed(event.target.checked)} /> {license.state === 'sample_available' ? 'J’accepte ces conditions de recette et je demande l’accès à l’échantillon après le paiement fictif.' : 'J’accepte ces conditions d’utilisation.'}</label>
       <button className={buttonClass} disabled={working || !agreed} onClick={save}>{license.state === 'sample_available' ? 'Essayer le paiement en mode test' : 'Activer ma licence gratuite'}</button>
     </>}
     {license?.state === 'revoked' && <p>Le règlement de recette a été remboursé ou contesté. Le droit de lecture a pris fin.</p>}
-    {license?.state === 'expired' && <p>Cette licence a expiré. L’accès au texte est fermé.</p>}
+    {license?.state === 'expired' && <p>Cette licence a expiré. L’accès à la création est fermé.</p>}
     {license?.state === 'active' && <p>{license.expiresAt ? `Accès jusqu’au ${new Date(license.expiresAt).toLocaleString('fr-FR')}.` : 'Licence active sans échéance.'}</p>}
+    {(accessible || license?.state === 'sample_owner') && license && <LicensedFile endpoint={url + '/fichier'} id={annonceId} state={license.state} revision={revision}>
     {accessible && <button className={buttonClass} onClick={() => { setLicense(null); setReading(value => !value); }}>{reading ? 'Fermer le texte' : 'Lire le texte'}</button>}
     {accessible && license && 'text' in license && reading && <article className="whitespace-pre-wrap break-words" aria-label="Texte de la création">{license.text}</article>}
+    </LicensedFile>}
     {license?.state === 'active' && <Link className="underline" href="/marketplace/mes-licences">Mes licences</Link>}
   </section>;
 }

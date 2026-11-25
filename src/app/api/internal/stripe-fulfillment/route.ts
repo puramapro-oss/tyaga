@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
 import { handleDigitalTestEvent } from '@/lib/digital-checkout-test';
+import { checkPilotCheckout, checkPilotRefund, type PaymentOrder } from '@/lib/physical-pilot-receipt';
+import { hasPhysicalTestStripeKey, PHYSICAL_PILOT_POLICY } from '@/lib/physical-sale-pilot';
 import { refundCompletedSale } from '@/lib/order-refund';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
@@ -70,15 +72,15 @@ export async function POST(request: Request) {
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session, service);
+        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session, service, event.livemode);
         break;
       }
       case 'checkout.session.expired': {
-        await handleExpired(event.data.object as Stripe.Checkout.Session, service);
+        await handleExpired(event.data.object as Stripe.Checkout.Session, service, event.livemode);
         break;
       }
       case 'charge.refunded': {
-        await handleRefunded(event.data.object as Stripe.Charge, service);
+        await handleRefunded(event.data.object as Stripe.Charge, service, event.livemode);
         break;
       }
       default:
@@ -105,11 +107,39 @@ export async function POST(request: Request) {
 
 type ServiceClient = ReturnType<typeof createServiceClient>;
 
+const paymentColumns = 'id,buyer_id,seller_id,amount_cents,fee_policy,stripe_checkout_session_id,stripe_payment_intent_id';
+
+async function readPaymentOrder(service: ServiceClient, column: 'id' | 'stripe_payment_intent_id' | 'stripe_checkout_session_id',
+  value: string, onlyPilot = false): Promise<PaymentOrder | null> {
+  let query = service.from('marketplace_orders').select(paymentColumns).eq(column, value);
+  if (onlyPilot) query = query.eq('fee_policy', PHYSICAL_PILOT_POLICY);
+  const { data, error } = await query.maybeSingle();
+  if (error) throw new Error('Lecture de la commande impossible.');
+  return data;
+}
+
+async function validateCheckout(service: ServiceClient, session: Stripe.Checkout.Session, live: boolean, expected: 'paid' | 'expired') {
+  const stated = session.metadata?.order_id;
+  const order = stated ? await readPaymentOrder(service, 'id', stated) : null;
+  // A missing or displaced metadata marker cannot disguise a session already
+  // bound to a pilot order as a legacy orphan eligible for an automatic refund.
+  const bound = session.id && order?.fee_policy !== PHYSICAL_PILOT_POLICY && order?.stripe_checkout_session_id !== session.id
+    ? await readPaymentOrder(service, 'stripe_checkout_session_id', session.id, true) : null;
+  const receiptOrder = bound ?? order;
+  checkPilotCheckout(receiptOrder, session, live, expected);
+  return receiptOrder?.fee_policy === PHYSICAL_PILOT_POLICY;
+}
+
+
 /** pending → paid + séquestre posé (fonds sur le solde plateforme). */
 async function handleCheckoutCompleted(
   session: Stripe.Checkout.Session,
-  service: ServiceClient
+  service: ServiceClient,
+  live: boolean
 ): Promise<void> {
+  const pilot = await validateCheckout(service, session, live, 'paid');
+  if (pilot && !hasPhysicalTestStripeKey()) throw new Error('Prestataire de test indisponible.');
+  const pilotStripe = pilot ? getStripe() : null;
   if (session.payment_status !== 'succeeded' && session.payment_status !== 'paid') return;
 
   const orderId = session.metadata?.order_id;
@@ -155,7 +185,7 @@ async function handleCheckoutCompleted(
         if (proofError) throw new Error(`refund proof ${cancelled.id}: ${proofError.code}`);
         if (refundProof?.refund_accounted_at) return;
       }
-      const refund = await getStripe().refunds.create({ payment_intent: paymentIntentId });
+      const refund = await (pilotStripe ?? getStripe()).refunds.create({ payment_intent: paymentIntentId });
       if (refund.status === 'failed') {
         throw new Error(`refund orphan ${paymentIntentId}: failed`);
       }
@@ -167,8 +197,10 @@ async function handleCheckoutCompleted(
 /** Session Checkout expirée sans paiement → commande annulée (system). */
 async function handleExpired(
   session: Stripe.Checkout.Session,
-  service: ServiceClient
+  service: ServiceClient,
+  live: boolean
 ): Promise<void> {
+  await validateCheckout(service, session, live, 'expired');
   const orderId = session.metadata?.order_id;
   if (!orderId) return;
 
@@ -188,10 +220,15 @@ async function handleExpired(
 /** Remboursement → commande annulée + séquestre remboursé + clawback points/vente. */
 async function handleRefunded(
   charge: Stripe.Charge,
-  service: ServiceClient
+  service: ServiceClient,
+  live: boolean
 ): Promise<void> {
+  const intent = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+  const order = intent ? await readPaymentOrder(service, 'stripe_payment_intent_id', intent) : null;
+  checkPilotRefund(order, charge, live);
+  const pilotStripe = order?.fee_policy === PHYSICAL_PILOT_POLICY ? getStripe() : null;
   await refundCompletedSale(charge, {
     store: service,
-    getTransfers: () => getStripe().transfers,
+    getTransfers: () => (pilotStripe ?? getStripe()).transfers,
   });
 }

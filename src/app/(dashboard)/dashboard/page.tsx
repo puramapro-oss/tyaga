@@ -43,6 +43,7 @@ export default async function DashboardPage() {
     supabase
       .from('ventes')
       .select('net_amount_cents, fiscal_year')
+      .eq('fee_policy', 'legacy')
       .eq('seller_id', user!.id),
     supabase
       .from('vida_wallet')

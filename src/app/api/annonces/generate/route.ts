@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { computeCommission } from '@/lib/commission';
+import { computeCommission, physicalPilotQuote } from '@/lib/commission';
 import { CONDITION_LABELS } from '@/lib/labels';
+import { canUsePhysicalSalePilot } from '@/lib/physical-sale-pilot';
 import { generateListing } from '@/lib/listing-ai';
 import { rateLimit } from '@/lib/rate-limit';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
@@ -107,6 +108,8 @@ export async function POST(request: Request) {
 
   // Rien n'est persisté : brouillon retourné, publication = action séparée
   return NextResponse.json({
-    draft: { ...draft, price_cents: estimation.price_suggested_cents, quote: computeCommission(estimation.price_suggested_cents) },
+    draft: { ...draft, price_cents: estimation.price_suggested_cents,
+      quote: computeCommission(estimation.price_suggested_cents),
+      pilotQuote: await canUsePhysicalSalePilot(supabase) ? physicalPilotQuote(estimation.price_suggested_cents) : null },
   });
 }

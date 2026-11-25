@@ -29,6 +29,7 @@ const FIELDS = [
 export default function BuyPanel({ annonceId, quote }: BuyPanelProps) {
   const [updated, setUpdated] = useState<{ annonceId: string; quote: CommissionBreakdown } | null>(null);
   const currentQuote = updated?.annonceId === annonceId ? updated.quote : quote;
+  const pilot = currentQuote.policy === 'fr_p2p_test_v2';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({ country: 'FR' });
@@ -52,7 +53,7 @@ export default function BuyPanel({ annonceId, quote }: BuyPanelProps) {
             ...(values.line2 ? { line2: values.line2 } : {}),
             postalCode: values.postalCode ?? '',
             city: values.city ?? '',
-            country: values.country || 'FR',
+            country: pilot ? 'FR' : values.country || 'FR',
           },
         }),
       });
@@ -99,7 +100,8 @@ export default function BuyPanel({ annonceId, quote }: BuyPanelProps) {
             name="country"
             placeholder="FR"
             maxLength={2}
-            value={values.country ?? 'FR'}
+            value={pilot ? 'FR' : values.country ?? 'FR'}
+            readOnly={pilot}
             onChange={(e) =>
               setValues((v) => ({ ...v, country: e.target.value.toUpperCase() }))
             }
@@ -124,12 +126,12 @@ export default function BuyPanel({ annonceId, quote }: BuyPanelProps) {
           ) : (
             <Lock size={16} />
           )}
-          Acheter — {formatPrice(currentQuote.grossCents)}
+          {pilot ? 'Tester le paiement' : 'Acheter'} — {formatPrice(currentQuote.grossCents)}
         </button>
       </form>
       <p className="text-xs leading-relaxed text-foreground-muted">
-        Paiement sécurisé via Stripe — aucun règlement hors plateforme. Le
-        vendeur est payé seulement après ta confirmation de réception.
+        {pilot ? 'Le paiement de test simule la transaction sans débit bancaire.' :
+          'Paiement sécurisé via Stripe — aucun règlement hors plateforme. Le vendeur est payé seulement après ta confirmation de réception.'}
       </p>
     </section>
   );
