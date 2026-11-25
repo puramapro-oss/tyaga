@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type Stripe from 'stripe';
 import { z } from 'zod';
 
 import { finalizeCompletedSale } from '@/lib/order-settlement';
@@ -17,8 +18,8 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 /**
  * EX-E3 — transitions de commande par action de la bonne partie.
- * La RLS `orders_update` est la garde FINALE ; ce routeur valide avant
- * pour renvoyer des erreurs FR claires. Après `deliver` (acheteur), le
+ * La RLS et le trigger protègent les transitions client. L'annulation exige
+ * un reçu d'expiration puis une RPC serveur atomique. Après `deliver`, le
  * système enchaîne delivered→completed : vente et points atomiques, puis
  * une tentative de virement Connect. Le séquestre reste held tant qu'aucun
  * reçu correspondant n'est enregistré (sauf net vendeur nul).
@@ -65,7 +66,7 @@ export async function POST(
   const { data: order } = await supabase
     .from('marketplace_orders')
     .select(
-      'id, buyer_id, seller_id, status, escrow_status, stripe_checkout_session_id, fee_policy'
+      'id, buyer_id, seller_id, status, escrow_status, amount_cents, stripe_checkout_session_id, fee_policy'
     )
     .eq('id', id)
     .maybeSingle();
@@ -112,7 +113,11 @@ export async function POST(
   }
 
   try {
-    assertTransition(actor, order.status as OrderStatus, to);
+    // A prior cancellation may have committed even when its response was lost.
+    // Replay still requires the same provider receipt and server-side checks.
+    const cancellationReplay = to === 'cancelled' && order.status === 'cancelled'
+      && order.escrow_status === 'none';
+    if (!cancellationReplay) assertTransition(actor, order.status as OrderStatus, to);
   } catch (e) {
     if (e instanceof TransitionError) {
       return NextResponse.json(
@@ -123,9 +128,56 @@ export async function POST(
     throw e;
   }
 
+  if (to === 'cancelled') {
+    const review = () => NextResponse.json({
+      error: 'L’état du paiement ou de l’annulation attend une vérification. Consulte tes commandes avant de réessayer.',
+      status: 'verification_required', orderId: order.id,
+    }, { status: 503 });
+    // A missing receipt can mean Stripe accepted a request whose response was
+    // lost. Never free the listing while that financial outcome is unknown.
+    if (!order.stripe_checkout_session_id) return review();
+    try {
+      const sessions = (pilotStripe ?? getStripe()).checkout.sessions;
+      let session: Stripe.Checkout.Session;
+      try {
+        session = await sessions.expire(order.stripe_checkout_session_id);
+      } catch {
+        // Expiring an already expired session fails. A lost response can also
+        // hide success, so read the same session instead of assuming either.
+        session = await sessions.retrieve(order.stripe_checkout_session_id);
+      }
+      if (session.status === 'complete' || session.payment_status === 'paid') {
+        return NextResponse.json({ error: 'Le paiement a déjà été engagé. Cette commande ne peut plus être annulée ici.' }, { status: 409 });
+      }
+      if (session.id !== order.stripe_checkout_session_id || session.status !== 'expired'
+        || session.payment_status !== 'unpaid' || session.mode !== 'payment'
+        || session.currency !== 'eur' || session.amount_total !== order.amount_cents
+        || (session.client_reference_id !== null && session.client_reference_id !== order.id)
+        || session.metadata?.app_slug !== 'tyaga' || session.metadata?.order_id !== order.id
+        || session.metadata?.buyer_id !== order.buyer_id || session.metadata?.seller_id !== order.seller_id
+        || (pilot && (session.livemode !== false || !/^cs_test_[A-Za-z0-9]+$/.test(session.id)))) {
+        return review();
+      }
+      // Persist only bounded proof fields, never the full provider payload.
+      // The RPC rechecks ownership, status and session under a PostgreSQL lock.
+      const { data: cancelled, error } = await createServiceClient().rpc('cancel_expired_order', {
+        p_order: order.id, p_actor: user.id,
+        p_session: { id: session.id, status: session.status, payment_status: session.payment_status,
+          mode: session.mode, currency: session.currency, amount_total: session.amount_total,
+          client_reference_id: session.client_reference_id, livemode: session.livemode,
+          metadata: { app_slug: 'tyaga', order_id: order.id, buyer_id: order.buyer_id, seller_id: order.seller_id } },
+      });
+      if (error || cancelled?.id !== order.id || cancelled?.status !== 'cancelled' || cancelled?.escrow_status !== 'none') {
+        return review();
+      }
+      return NextResponse.json({ order: cancelled });
+    } catch {
+      return review();
+    }
+  }
+
   const now = new Date().toISOString();
-  // Garde finale = RLS : buyer pending→cancelled / shipped→delivered,
-  // seller paid→shipped / pending→cancelled
+  // RLS + trigger: buyer shipped→delivered, seller paid→shipped.
   const { data: updated, error: updateError } = await supabase
     .from('marketplace_orders')
     .update({ status: to, updated_at: now })
@@ -139,17 +191,6 @@ export async function POST(
       { error: 'Action refusée (transition non autorisée).' },
       { status: 403 }
     );
-  }
-
-  // Annulation avant paiement → on ferme la session Checkout qui traîne
-  // (sinon l'acheteur pourrait payer une commande annulée ; le webhook
-  // `checkout.session.expired` est le filet de secours). Best-effort.
-  if (to === 'cancelled' && order.status === 'pending' && order.stripe_checkout_session_id) {
-    try {
-      await (pilotStripe ?? getStripe()).checkout.sessions.expire(order.stripe_checkout_session_id);
-    } catch {
-      // Session déjà payée/expirée : le webhook tranche l'état final.
-    }
   }
 
   // Acheteur a confirmé la réception → le système FINALISE la vente.

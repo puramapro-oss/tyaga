@@ -1,0 +1,16 @@
+[
+  {
+    "file": "recovery-before.tap",
+    "before_sha256": "9cf472ba281ad00f766064ed2e85590289568924170c592a40148d961ccdea59",
+    "after_sha256": "7d00dcdb9ef08fef6b9492f8b8c3454e570042257cab100c2643d8eface72c08",
+    "operation": "remove trailing horizontal whitespace and extra final blank lines only",
+    "raw_bytes_preserved_in": "raw-logs.json UTF-8 strings"
+  },
+  {
+    "file": "typecheck.log",
+    "before_sha256": "a29f7a0dba93de23b3e0dc62ab3de5f1d09b15cf313d01c33ba7af2a871b831b",
+    "after_sha256": "30b240e9b5366d4dae9c0a7762df615da53da31249c906ff97e80ffa7fa577a2",
+    "operation": "remove trailing horizontal whitespace and extra final blank lines only",
+    "raw_bytes_preserved_in": "raw-logs.json UTF-8 strings"
+  }
+]

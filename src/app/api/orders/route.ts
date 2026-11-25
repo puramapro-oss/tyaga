@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type Stripe from 'stripe';
 import { z } from 'zod';
 
 import { createPhysicalPilotCheckout } from '@/lib/physical-pilot-checkout';
@@ -104,18 +105,58 @@ export async function POST(request: Request) {
   }
   if (pilot) return createPhysicalPilotCheckout(supabase, annonce, user.id, quote, shippingAddress);
 
+  const verificationRequired = (orderId?: string) => NextResponse.json({
+    error: 'Le paiement attend une vérification. Consulte tes commandes avant une nouvelle tentative.',
+    status: 'verification_required', ...(orderId ? { orderId } : {}),
+  }, { status: 503 });
+  const conflict = () => NextResponse.json({
+    error: 'Cet objet a déjà une commande en cours. Consulte tes commandes.',
+  }, { status: 409 });
+  const validSession = (session: Stripe.Checkout.Session, orderId: string, historical = false) =>
+    /^cs_[A-Za-z0-9_]+$/.test(session.id) && session.mode === 'payment'
+    && session.currency === 'eur' && session.amount_total === quote.grossCents
+    && (session.client_reference_id === orderId || (historical && session.client_reference_id == null))
+    && session.metadata?.app_slug === 'tyaga' && session.metadata?.order_id === orderId
+    && session.metadata?.buyer_id === user.id && session.metadata?.seller_id === annonce.user_id;
+
+  const resumePendingCheckout = async () => {
+    const { data: prior, error } = await supabase.from('marketplace_orders')
+      .select('id, buyer_id, seller_id, amount_cents, commission_pct, commission_amount_cents, net_amount_cents, shipping_address, stripe_checkout_session_id, fee_policy')
+      .eq('annonce_id', annonceId).eq('buyer_id', user.id).eq('status', 'pending').maybeSingle();
+    if (error) return verificationRequired();
+    if (!prior || prior.buyer_id !== user.id || prior.seller_id !== annonce.user_id || prior.fee_policy !== 'legacy') return conflict();
+    const addressMatches = prior.shipping_address && Object.keys({ ...shippingAddress, ...prior.shipping_address })
+      .every(key => prior.shipping_address[key] === shippingAddress[key as keyof typeof shippingAddress]);
+    if (!addressMatches || !sameSaleQuote(quote, {
+      grossCents: prior.amount_cents, commissionPct: prior.commission_pct,
+      commissionCents: prior.commission_amount_cents, netCents: prior.net_amount_cents,
+    })) return conflict();
+    // Historical pending rows do not prove that an idempotency key was used.
+    // No new create, including after Stripe's retention window: only read a
+    // session already bound to this buyer and immutable order.
+    if (!prior.stripe_checkout_session_id) return verificationRequired(prior.id);
+    try {
+      const session = await getStripe().checkout.sessions.retrieve(prior.stripe_checkout_session_id);
+      if (session.id !== prior.stripe_checkout_session_id || !validSession(session, prior.id, true)) {
+        return verificationRequired(prior.id);
+      }
+      if (session.status !== 'open' || !session.url) return NextResponse.json({
+        error: 'Cette session de paiement est terminée. Consulte tes commandes.',
+      }, { status: 409 });
+      return NextResponse.json({ url: session.url });
+    } catch {
+      return verificationRequired(prior.id);
+    }
+  };
+
   // Une seule commande active par annonce
-  const { count: activeCount } = await supabase
+  const { count: activeCount, error: activeError } = await supabase
     .from('marketplace_orders')
     .select('id', { count: 'exact', head: true })
     .eq('annonce_id', annonceId)
     .in('status', ['pending', 'paid', 'shipped', 'delivered', 'completed']);
-  if ((activeCount ?? 0) > 0) {
-    return NextResponse.json(
-      { error: 'Cet objet a déjà un acheteur en cours.' },
-      { status: 409 }
-    );
-  }
+  if (activeError || activeCount === null) return verificationRequired();
+  if (activeCount > 0) return resumePendingCheckout();
 
   const { grossCents, commissionPct, commissionCents, netCents } = quote;
 
@@ -141,10 +182,7 @@ export async function POST(request: Request) {
   if (orderError?.code === '23505') {
     // idx_orders_annonce_active : un autre acheteur est passé entre le count
     // et l'insert (fenêtre TOCTOU fermée par l'index unique partiel).
-    return NextResponse.json(
-      { error: 'Cet objet a déjà un acheteur en cours.' },
-      { status: 409 }
-    );
+    return resumePendingCheckout();
   }
   if (orderError || !order) {
     return NextResponse.json(
@@ -155,30 +193,31 @@ export async function POST(request: Request) {
 
   // Customer Stripe : création une fois, réutilisation ensuite
   const service = createServiceClient();
-  const { data: profile } = await service
-    .from('profiles')
-    .select('stripe_customer_id')
-    .eq('id', user.id)
-    .single();
-
-  const stripe = getStripe();
-  let customerId = profile?.stripe_customer_id ?? null;
+  let checkoutAttempted = false;
   try {
+    const { data: profile, error: profileError } = await service
+      .from('profiles').select('stripe_customer_id').eq('id', user.id).single();
+    if (profileError || !profile) throw new Error('Profil de paiement indisponible.');
+    const stripe = getStripe();
+    let customerId = profile.stripe_customer_id ?? null;
     if (!customerId) {
       const customer = await stripe.customers.create({
         metadata: { app_slug: 'tyaga', user_id: user.id },
-      });
+      }, { idempotencyKey: `tyaga:customer:v1:${user.id}` });
       customerId = customer.id;
-      await service
+      const { data: savedCustomer, error: customerError } = await service
         .from('profiles')
         .update({ stripe_customer_id: customerId })
-        .eq('id', user.id);
+        .eq('id', user.id).select('id').maybeSingle();
+      if (customerError || !savedCustomer) throw new Error('Profil de paiement non enregistré.');
     }
 
     const origin = new URL(request.url).origin;
+    checkoutAttempted = true;
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer: customerId,
+      client_reference_id: order.id,
       line_items: [
         {
           quantity: 1,
@@ -206,24 +245,36 @@ export async function POST(request: Request) {
       },
       success_url: `${origin}/commandes?paiement=ok`,
       cancel_url: `${origin}/marketplace/${annonce.id}?annule=1`,
-    });
+    }, { idempotencyKey: `tyaga:checkout:v1:${order.id}` });
+
+    if (!validSession(session, order.id) || session.status !== 'open' || !session.url) {
+      return verificationRequired(order.id);
+    }
 
     // Session id hors RLS (WITH CHECK ne couvre pas pending→pending) → service role
-    await service
+    const { data: saved, error: saveError } = await service
       .from('marketplace_orders')
       .update({ stripe_checkout_session_id: session.id, updated_at: new Date().toISOString() })
-      .eq('id', order.id);
+      .eq('id', order.id).eq('status', 'pending').is('stripe_checkout_session_id', null)
+      .select('id').maybeSingle();
+    if (saveError || !saved) return verificationRequired(order.id);
 
     return NextResponse.json({ url: session.url });
   } catch {
-    // Pas de session → commande annulée immédiatement (jamais de pending fantôme)
-    await service
-      .from('marketplace_orders')
-      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-      .eq('id', order.id);
-    return NextResponse.json(
-      { error: 'Paiement indisponible momentanément. Aucun montant n’a été débité.' },
-      { status: 502 }
-    );
+    // A rejected/lost provider response does not prove that no session exists.
+    // Preserve the active order so a retry cannot emit a second checkout.
+    if (!checkoutAttempted) {
+      try {
+        const { data: cancelled, error: cancelError } = await service.from('marketplace_orders')
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+          .eq('id', order.id).eq('status', 'pending').is('stripe_checkout_session_id', null)
+          .select('id').maybeSingle();
+        if (cancelError || cancelled?.id !== order.id) return verificationRequired(order.id);
+      } catch {
+        return verificationRequired(order.id);
+      }
+      return NextResponse.json({ error: 'Paiement indisponible momentanément. Réessaie dans un instant.' }, { status: 503 });
+    }
+    return verificationRequired(order.id);
   }
 }

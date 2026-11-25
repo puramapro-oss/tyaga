@@ -1,0 +1,107 @@
+(node:12) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/src/lib/physical-fee-policy.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ provider response lost: preserve the pending order and a retry never emits another session (154.088562ms)
+✔ a failed session receipt write never advertises a usable checkout (13.016338ms)
+✔ receipt acknowledgement lost after commit: retry reads the original session and recovers (12.607817ms)
+✔ a successful request can be replayed after rename or an old timestamp without creating again (12.302692ms)
+✔ an old pending order without a stored session is explicit uncertainty, never a fresh create (11.452255ms)
+✔ another buyer cannot resume or replace an existing checkout (19.467502ms)
+✔ changed address or quote cannot silently reuse the earlier contract (8.189759ms)
+✔ mismatched provider receipt is refused: {"amount_total":1} (8.218975ms)
+✔ mismatched provider receipt is refused: {"currency":"usd"} (8.894729ms)
+✔ mismatched provider receipt is refused: {"metadata":{"app_slug":"other"}} (8.021659ms)
+✔ mismatched provider receipt is refused: {"client_reference_id":"another-order"} (8.050938ms)
+✔ mismatched provider receipt is refused: {"mode":"subscription"} (6.751576ms)
+✔ mismatched provider receipt is refused: {"id":"not-a-checkout"} (6.34804ms)
+✔ expired and complete sessions do not return a checkout URL or create a new one (15.518001ms)
+✔ lookup failure never falls through into a new financial operation (6.693128ms)
+✔ a concurrent order transition prevents the route returning a stale checkout (9.595303ms)
+✔ unauthenticated requests and the 3 percent pilot retain their existing contracts (27.381421ms)
+✔ actual BuyPanel displays the uncertain-payment error and never navigates to a missing URL (61.309079ms)
+✔ buyer cancellation requires an expired matching provider receipt before the server action (13.166312ms)
+✔ seller cancellation requires an expired matching provider receipt before the server action (11.956461ms)
+✔ unknown checkout outcome cannot be cancelled to open another checkout (12.870053ms)
+✔ expiry reconciliation: already_expired (12.775938ms)
+✔ expiry reconciliation: expiry_response_lost (12.419872ms)
+✔ failed expiry preserves an open checkout and its order (17.879639ms)
+✔ payment won the race: complete (7.387438ms)
+✔ payment won the race: paid (7.747538ms)
+✔ cancellation refuses an unmatched expiry receipt: {"amount_total":1} (7.21707ms)
+✔ cancellation refuses an unmatched expiry receipt: {"metadata":{}} (8.706289ms)
+✔ cancellation refuses an unmatched expiry receipt: {"id":"cs_test_other"} (8.810111ms)
+✔ missing cancellation migration never falls back to a direct order update (7.562983ms)
+✔ payment recorded before cancellation finalization prevents a cancelled response (9.793374ms)
+✖ lost cancellation acknowledgement is honest and replay reconciles the same receipt (13.246831ms)
+✖ failed pre-checkout cleanup remains explicit: cleanupError (10.750283ms)
+✖ failed pre-checkout cleanup remains explicit: cleanupNoRows (9.478805ms)
+✔ definite pre-checkout failure releases the order only after confirmed cleanup (11.201898ms)
+✔ cancellation still requires the authenticated action owner (10.825602ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 33
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1943.767655
+
+✖ failing tests:
+
+test at tests/checkout-order-route.test.mjs:421:1
+✖ lost cancellation acknowledgement is honest and replay reconciles the same receipt (13.246831ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /reste réservée/i. Input:
+
+  'Le paiement attend une vérification. La commande reste réservée avant toute annulation.'
+
+      at TestContext.<anonymous> (file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/checkout-order-route.test.mjs:427:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Le paiement attend une vérification. La commande reste réservée avant toute annulation.',
+    expected: /reste réservée/i,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at tests/checkout-order-route.test.mjs:435:57
+✖ failed pre-checkout cleanup remains explicit: cleanupError (10.750283ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + undefined
+  - 'verification_required'
+
+      at TestContext.<anonymous> (file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/checkout-order-route.test.mjs:439:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'verification_required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/checkout-order-route.test.mjs:435:57
+✖ failed pre-checkout cleanup remains explicit: cleanupNoRows (9.478805ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+
+  + undefined
+  - 'verification_required'
+
+      at TestContext.<anonymous> (file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/checkout-order-route.test.mjs:439:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 'verification_required',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

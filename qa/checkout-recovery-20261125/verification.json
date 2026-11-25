@@ -1,0 +1,83 @@
+{
+  "status": "PARTIAL",
+  "base_commit": "70c2e74ac78bfb2bce263c0e323934c6b296d3e5",
+  "branch": "codex/audit-tyaga-checkout-reconcile-20261125",
+  "merge_ready": false,
+  "production_effects": false,
+  "new_sql_migration_executed": false,
+  "native_postgres_concurrency_executed": false,
+  "provider": "strictly simulated adapters; real TypeScript HTTP handlers",
+  "source_sha256": {
+    "src/app/api/orders/route.ts": "9bbfaa770951b671fb03231252c510e8b34c38169622ea944d35487d9f1ea6ba",
+    "src/app/api/orders/[id]/transition/route.ts": "813a5c395372bf6a5c622396bedec68291b8083ec56a82e7e700808448c3f615",
+    "sql/20261125-checkout-cancellation.sql": "5eb0b716b171ef1c6a166cf295cc2db3a7a62c0cc423d2a854324bda01b26522",
+    "tests/checkout-order-route.test.mjs": "e5cd84e453b36a08394c8b22f5bd74bdecf8c384093da7392ea810b3034a6e31",
+    "package.json": "eb06e5261a5e592db0dcdf1df8ae67892a1a863e5911aa21b82fd8d80792aba6",
+    "vercel.json": "8aaa7191b16a37e4db86f7718841af2d0b6b78eb8f77acef688747481a5effc4"
+  },
+  "checks": {
+    "recovery_before": {
+      "tests": 36,
+      "pass": 33,
+      "fail": 3,
+      "exit": 1
+    },
+    "recovery_after": {
+      "tests": 37,
+      "pass": 37,
+      "fail": 0,
+      "skipped": 0,
+      "exit": 0
+    },
+    "unit": {
+      "tests": 168,
+      "pass": 168,
+      "fail": 0,
+      "skipped": 0,
+      "exit": 0,
+      "includes_recovery": 37
+    },
+    "typecheck": {
+      "command": "npm run typecheck",
+      "exit": 0
+    },
+    "lint": {
+      "command": "node node_modules/eslint/bin/eslint.js src tests/checkout-order-route.test.mjs --max-warnings 0",
+      "exit": 0
+    },
+    "independent_http_review": "PASS, two findings corrected, no new concrete finding",
+    "gitnexus_impact": "UNKNOWN; dynamic HTTP calls not resolved, manual callsite review added",
+    "diff_check": "PASS after whitespace-only normalization of copied logs; originals preserved in raw-logs.json",
+    "gitnexus_detect": "Executed on staged scope; see detect-changes.txt. Graph partial; no native SQL conclusion."
+  },
+  "automatic_interruption": {
+    "message": "This content was flagged for possible cybersecurity risk.",
+    "action_context": "sub-agent turn while preparing additional cancellation test scenarios",
+    "detailed_reason_available": false,
+    "safe_followup_scope": "HTTP error handling and simulated adapter tests only; SQL file unchanged and not executed"
+  },
+  "remaining": [
+    "new migration isolated SQL qualification and permissions",
+    "native PostgreSQL multi-connection races",
+    "real Stripe provider qualification",
+    "production migration and deployment"
+  ],
+  "proof_files_sha256": {
+    "detect-changes.txt": "68b700199d6fd7802502508e7274a7f448376d60b8c55d34174372e54ff365d1",
+    "impact-orders.txt": "3d3ea006d4e935126734f937ac2f47b31789c3e8712c5cc0ff4b0118d286bb83",
+    "impact-transition.txt": "f2ba58f62491005ab9723e02b850d6fe3e5fc96651a72fe938c132fb2d7db6d5",
+    "lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "log-normalization.json": "b6577eb93b21766c174d61cfe87af8b84caa2cd6bd18fa64419cf05b2e341510",
+    "raw-logs.json": "be5f0e09710c688239007cc7c06533d12db429671ab4f46b318d37f1362d8197",
+    "recovery-after.tap": "ea6781bdc590fb86e3d55dff11327feeaffe1af660118b707bddf0ed8203695a",
+    "recovery-before.tap": "7d00dcdb9ef08fef6b9492f8b8c3454e570042257cab100c2643d8eface72c08",
+    "typecheck.log": "30b240e9b5366d4dae9c0a7762df615da53da31249c906ff97e80ffa7fa577a2",
+    "unit-tests.tap": "436e6696098976938319c7e448ac7490d4904397a3a08cf9eb4c0e01544b4c27"
+  },
+  "publication_scan": {
+    "families": 7,
+    "paths_scanned": 18,
+    "literal_matches": [],
+    "exhaustive_security_audit": false
+  }
+}

@@ -1,0 +1,259 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> tyaga@0.1.0 test:unit
+> node --experimental-vm-modules --conditions=react-server --import ./tests/ts-resolve.mjs --test tests/*.test.ts tests/checkout-order-route.test.mjs
+
+✔ refuse une destination ambiguë ou externe : null (4.101457ms)
+✔ refuse une destination ambiguë ou externe : "" (1.016009ms)
+✔ refuse une destination ambiguë ou externe : "dashboard" (0.195494ms)
+✔ refuse une destination ambiguë ou externe : " /dashboard" (0.555766ms)
+✔ refuse une destination ambiguë ou externe : "//outside.example/path" (0.146664ms)
+✔ refuse une destination ambiguë ou externe : "///outside.example/path" (0.109395ms)
+✔ refuse une destination ambiguë ou externe : "https://outside.example/path" (0.099105ms)
+✔ refuse une destination ambiguë ou externe : "https://tyaga.purama.dev/dashboard" (0.133195ms)
+✔ refuse une destination ambiguë ou externe : "javascript:alert(1)" (0.130805ms)
+✔ refuse une destination ambiguë ou externe : "/\\outside.example/path" (0.374819ms)
+✔ refuse une destination ambiguë ou externe : "/\t/outside.example/path" (0.419426ms)
+✔ refuse une destination ambiguë ou externe : "/\n/outside.example/path" (0.114173ms)
+✔ refuse une destination ambiguë ou externe : "/\r/outside.example/path" (0.143015ms)
+✔ refuse une destination ambiguë ou externe : "/a/..//outside.example/path" (0.125034ms)
+✔ refuse une destination ambiguë ou externe : "/a/%2e%2e//outside.example/path" (0.078931ms)
+✔ refuse une destination ambiguë ou externe : "/a/../\\outside.example/path" (0.316701ms)
+✔ refuse une destination ambiguë ou externe : "/safe\u0000/path" (0.068208ms)
+✔ refuse une destination ambiguë ou externe : "/safe/path" (0.045627ms)
+✔ préserve la destination interne : / (1.060896ms)
+✔ préserve la destination interne : /dashboard (0.13626ms)
+✔ préserve la destination interne : /commandes (0.099161ms)
+✔ préserve la destination interne : /objets/123?vue=liste#details (0.387073ms)
+✔ préserve la destination interne : /objets/../dashboard (0.282528ms)
+✔ préserve la destination interne : /mes objets?q=café#été (0.749463ms)
+✔ préserve la destination interne : /dashboard?return=https%3A%2F%2Foutside.example%2F (0.313492ms)
+✔ préserve la destination interne : /objets/123?key=a%2Fb%2Bc (0.16552ms)
+✔ préserve la destination interne : /@outside.example/path (0.263123ms)
+✔ aucun caractère de contrôle brut ne peut ouvrir une nouvelle origine (0.608719ms)
+✔ la destination retournée reste interne après normalisation et reparsage (3.523668ms)
+✔ le lien d’annonce et ses filtres survivent à la création de compte puis au retour OAuth ou e-mail (1.287176ms)
+(node:25) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/auth-redirect.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/src/lib/physical-fee-policy.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:26) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ provider response lost: preserve the pending order and a retry never emits another session (119.336677ms)
+✔ a failed session receipt write never advertises a usable checkout (10.610097ms)
+✔ receipt acknowledgement lost after commit: retry reads the original session and recovers (9.818131ms)
+✔ a successful request can be replayed after rename or an old timestamp without creating again (7.760103ms)
+✔ an old pending order without a stored session is explicit uncertainty, never a fresh create (15.16836ms)
+✔ another buyer cannot resume or replace an existing checkout (5.81188ms)
+✔ changed address or quote cannot silently reuse the earlier contract (6.574386ms)
+✔ mismatched provider receipt is refused: {"amount_total":1} (5.819142ms)
+✔ mismatched provider receipt is refused: {"currency":"usd"} (6.05237ms)
+✔ mismatched provider receipt is refused: {"metadata":{"app_slug":"other"}} (6.694716ms)
+✔ mismatched provider receipt is refused: {"client_reference_id":"another-order"} (5.5327ms)
+✔ mismatched provider receipt is refused: {"mode":"subscription"} (5.864353ms)
+✔ mismatched provider receipt is refused: {"id":"not-a-checkout"} (8.052156ms)
+✔ expired and complete sessions do not return a checkout URL or create a new one (16.121929ms)
+✔ lookup failure never falls through into a new financial operation (7.16409ms)
+✔ a concurrent order transition prevents the route returning a stale checkout (5.276458ms)
+✔ unauthenticated requests and the 3 percent pilot retain their existing contracts (19.290829ms)
+✔ actual BuyPanel displays the uncertain-payment error and never navigates to a missing URL (43.67974ms)
+✔ buyer cancellation requires an expired matching provider receipt before the server action (31.519204ms)
+✔ seller cancellation requires an expired matching provider receipt before the server action (8.854964ms)
+✔ unknown checkout outcome cannot be cancelled to open another checkout (8.703897ms)
+✔ expiry reconciliation: already_expired (12.500923ms)
+✔ expiry reconciliation: expiry_response_lost (7.668956ms)
+✔ failed expiry preserves an open checkout and its order (7.302865ms)
+✔ payment won the race: complete (6.414226ms)
+✔ payment won the race: paid (7.360993ms)
+✔ cancellation refuses an unmatched expiry receipt: {"amount_total":1} (7.406979ms)
+✔ cancellation refuses an unmatched expiry receipt: {"metadata":{}} (6.197385ms)
+✔ cancellation refuses an unmatched expiry receipt: {"id":"cs_test_other"} (6.322049ms)
+✔ missing cancellation migration never falls back to a direct order update (6.159188ms)
+✔ payment recorded before cancellation finalization prevents a cancelled response (8.001737ms)
+✔ lost cancellation acknowledgement is honest and replay reconciles the same receipt (7.808033ms)
+✔ failed pre-checkout cleanup remains explicit: cleanupError (9.131465ms)
+✔ failed pre-checkout cleanup remains explicit: cleanupNoRows (7.502282ms)
+✔ failed pre-checkout cleanup remains explicit: cleanupThrows (5.743067ms)
+✔ definite pre-checkout failure releases the order only after confirmed cleanup (4.639333ms)
+✔ cancellation still requires the authenticated action owner (6.672562ms)
+✔ EX-C2 — net serveur = prix × 90 % (commission 10 %) (1.463973ms)
+✔ EX-E2 — arrondi au centime inférieur, jamais de centime fantôme (0.327408ms)
+✔ invariant : net + commission = brut, sur montants impairs (0.368487ms)
+✔ gardes : négatif, NaN, infini → erreur explicite (0.97506ms)
+(node:27) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/commission.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Le reçu Stripe de recette vérifie la destination, le bénéficiaire, la devise, le montant et la charge (1.782015ms)
+✔ Un remboursement ou un litige révoque une licence, un abandon et une attente ne délivrent rien (0.260573ms)
+(node:28) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/digital-payment-proof.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ cumule uniquement les ventes de l’année demandée (1.096399ms)
+✔ liste vide → 0 net, pas d’alerte (0 si 0) (0.223531ms)
+✔ pas d’alerte sous 250 € nets cumulés (0.167425ms)
+✔ alerte dès 250 € nets cumulés (>=, frontière exacte) (0.134391ms)
+✔ seuil constant 25 000 cents (0.110246ms)
+✔ formatEuros tronque (floor) et formate en français (28.057817ms)
+(node:29) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/fiscal.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:30) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/image-runtime.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the patched image runtime encodes and decodes png (13.53716ms)
+✔ the patched image runtime encodes and decodes jpeg (7.98086ms)
+✔ the patched image runtime encodes and decodes webp (4.903015ms)
+✔ the patched image runtime encodes and decodes avif (28.777446ms)
+✔ EX-F4 : détecte IBAN (24.766196ms)
+✔ EX-F4 : détecte PayPal (3.901399ms)
+✔ EX-F4 : détecte WhatsApp, Telegram, Revolut, Lydia (1.582673ms)
+✔ EX-F4 : détecte téléphone FR (+33 et 0X) (1.57298ms)
+✔ EX-F4 : détecte email de contact (6.488623ms)
+✔ EX-F4 : détecte RIB français (0.95409ms)
+✔ EX-F4 : laisse passer un message normal (1.176602ms)
+✔ EX-F2 : acheteur = 3 suggestions sans montant (plancher inconnu) (1.005661ms)
+✔ EX-F3 : offre sous plancher → refus poli proposé, jamais de contre < plancher (56.962495ms)
+✔ EX-F3 : contre-offre au plancher exact quand offre < plancher (1.475014ms)
+✔ EX-F3 : offre ≥ plancher → acceptation proposée au montant offert (5.982975ms)
+✔ EX-F2 : vendeur sans offre = 2 réponses d’accueil (0.771173ms)
+(node:47) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/inbox.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ les formats autorisés sont reconnus par signature et structure du conteneur (2.330113ms)
+✔ la lecture borne les flux sans Content-Length (8.780138ms)
+(node:52) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/licensed-file.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ deux prix distincts, sans conversion entre euros et points (10.972582ms)
+✔ période de tarification demi-ouverte, heures UTC uniquement (0.439841ms)
+✔ aucun prix implicite, montant client ou autre devise (0.752407ms)
+(node:101) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/listing-promotion.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ une recherche publique n’expose que son titre relu, son type et son budget (16.640622ms)
+(node:105) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/listing-public-preview.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ les filtres de catalogue survivent à la connexion et à la pagination (0.962513ms)
+✔ une ancienne URL sans filtre revient au catalogue simple (0.148889ms)
+✔ les champs inconnus, ambigus et hors limites restent en dehors du retour (0.145768ms)
+(node:116) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/marketplace-filters.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ Les sujets proches priment, les accents, pluriels et tags sont pris en compte (8.906731ms)
+✔ Les termes génériques, le prix ou un format commun ne suffisent pas (0.340274ms)
+✔ Les photos signées correspondent au propriétaire et à l’objet de la fiche (0.600227ms)
+(node:129) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/marketplace-matches.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ publier une annonce numérique offer/sale (21.174212ms)
+✔ publier une annonce numérique offer/rental (6.558944ms)
+✔ publier une annonce numérique wanted/sale (0.300128ms)
+✔ publier une annonce numérique wanted/rental (0.239048ms)
+✔ validation de la licence, du prix et du consentement (2.915571ms)
+✔ la recherche physique ne permet pas de publier une offre ou un fichier (1.697088ms)
+✔ une reprise ne valide pas des conditions, un budget ou une durée modifiés (0.739098ms)
+(node:137) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/member-listings.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ an exact single match is recorded without emitting a transfer (23.769294ms)
+✔ reconciliation refuses a mismatched amount (0.383111ms)
+✔ reconciliation refuses a mismatched currency (0.293972ms)
+✔ reconciliation refuses a mismatched destination (0.365044ms)
+✔ reconciliation refuses a mismatched group (0.199271ms)
+✔ reconciliation refuses a mismatched order (0.202512ms)
+✔ reconciliation refuses a mismatched application (0.261688ms)
+✔ reconciliation refuses a mismatched metadata (4.316504ms)
+✔ reconciliation refuses a mismatched identifier (0.455377ms)
+✔ reconciliation refuses a mismatched reversal amount (0.425217ms)
+✔ no result never authorizes another transfer (0.541202ms)
+✔ two matches never authorizes another transfer (0.160573ms)
+✔ incomplete page never authorizes another transfer (0.135089ms)
+✔ expanded Stripe destination is checked by account identifier (0.827291ms)
+✔ incoherent returned order fails before Stripe (1.156417ms)
+✔ a refunded order in an incoherent claimed response cannot emit (0.426929ms)
+✔ a terminal state carrying an emission flag fails closed (0.273472ms)
+✔ a terminal state without matching receipts does not advertise a paid seller (0.174632ms)
+✔ payment label requires evidence: released/null/9000 (2.251184ms)
+✔ payment label requires evidence: released/tr_existing/9000 (0.128528ms)
+✔ payment label requires evidence: refunded/tr_existing/9000 (0.049588ms)
+✔ payment label requires evidence: held/null/9000 (0.049697ms)
+✔ payment label requires evidence: held/tr_existing/9000 (0.035769ms)
+✔ payment label requires evidence: released/null/0 (0.034627ms)
+(node:145) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/order-settlement.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ buyer : pending→cancelled et shipped→delivered uniquement (1.331838ms)
+✔ seller : paid→shipped et pending→cancelled (retrait de vente) (0.295712ms)
+✔ system : paiement, clôture, remboursement (0.217725ms)
+✔ USER_ACTIONS mappent les 4 actions utilisateur (1.015108ms)
+✔ assertTransition lève TransitionError sur transition interdite (0.564033ms)
+(node:158) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/order-transitions.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ prix accepté et commission historique sur le prix convenu (2.578021ms)
+✔ absence, nouvel ordre des messages, désaccord et prix invalide conservent le prix affiché (0.280537ms)
+✔ la confirmation porte sur le prix, le taux, les frais et le net (0.303133ms)
+✔ tarif français attaché à chaque annonce, frais acheteur arrondis au centime, net vendeur entier (4.575888ms)
+✔ deux barèmes différents au même total nécessitent une nouvelle confirmation (0.208579ms)
+✔ négociation à 12,50 € sur une ancienne et une nouvelle annonce en vente à 25 € (1.911961ms)
+✔ seule une base acceptant le barème actuel peut offrir une nouvelle publication pilote (3.235538ms)
+✔ une configuration historique vide conserve le défaut ; zéro explicite reste valable (5.923559ms)
+(node:164) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/physical-order-quote.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ closed by default, restricted to the configured application, schema and isolated backend (14.707968ms)
+✔ quote resolves server-side owner of a published listing, returns only authorized terms (6.879077ms)
+✔ purchase and quote require a live auth session and ownership; outages do not admit requests (2.474812ms)
+✔ purchase requires exact same origin, JSON and bounded body; rejects client monetary or identity fields (9.225646ms)
+✔ a confirmed purchase and retry use the same actor, request and tariff; only receipt fields are served (2.371599ms)
+✔ maps definitive declines and uncertain confirmations to distinct responses (3.468232ms)
+✔ receipt recovery reads by authenticated actor and exact request, including after withdrawal or refund (6.120169ms)
+(node:176) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/promotion-points-test.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ N1 = 50 % de la commission, arrondi au point (1.932988ms)
+✔ N1 gardes : négatif, nul, non fini → 0 (0.429488ms)
+✔ normalizeCode : trim + majuscules (0.209533ms)
+✔ referralLink : origin + code encodé (0.199035ms)
+✔ pattern code : TY- + 6 hexa majuscules (0.401692ms)
+(node:189) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/referral.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ EX-H1 — pointsFromNet : 1 pt = 1 € net, floor toujours (1.235983ms)
+✔ EX-H2 — transferts : exactement 0/30/50/100, floor du montant versé (1.103304ms)
+✔ isTransferPct refuse toute autre valeur (0.375293ms)
+✔ EX-H4 — progression : pct plafonné, reste, seuil atteint (0.437184ms)
+✔ libellés objectifs : miroir du CHECK base, fallback « Autre » (0.196968ms)
+(node:195) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/scratch/c84d8dbc952f/tyaga-audit/tests/vida.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /workspace/scratch/c84d8dbc952f/tyaga-audit/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ℹ tests 168
+ℹ suites 0
+ℹ pass 168
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2985.868044
