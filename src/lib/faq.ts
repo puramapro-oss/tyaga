@@ -38,7 +38,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
     entries: [
       {
         q: 'Combien coûte TYAGA ?',
-        a: 'Le brouillon indique le tarif appliqué, le total acheteur et le net vendeur. Sur le tarif habituel, la commission est déduite du prix vendeur. Les participants qualifiés à la recette française peuvent tester un tarif distinct de 0 % vendeur et 2,9 % + 0,35 € côté acheteur, sans argent réel.',
+        a: 'Le brouillon indique le tarif appliqué, le total acheteur et le net vendeur. Sur le tarif habituel, la commission est déduite du prix vendeur. Les participants qualifiés à la recette française peuvent tester un tarif distinct de 0 % vendeur et 3,0 % + 0,35 € côté acheteur sur les nouvelles annonces. Les annonces déjà publiées à 2,9 % + 0,35 € conservent ce tarif. Ces paiements sont simulés.',
       },
       {
         q: 'Comment suis-je payé ?',

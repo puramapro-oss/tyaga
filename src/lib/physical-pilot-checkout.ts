@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 
 import type { CommissionBreakdown } from './commission';
-import { canUsePhysicalSalePilot, PHYSICAL_PILOT_POLICY, physicalPilotTestOrigin } from './physical-sale-pilot';
+import { isPhysicalPilotPolicy } from './physical-fee-policy';
+import { canUsePhysicalSalePilot, physicalPilotTestOrigin } from './physical-sale-pilot';
 import { createServiceClient } from './service';
 import { getStripe } from './stripe';
 import type { createServerSupabaseClient } from './supabase-server';
@@ -14,7 +15,7 @@ const unavailable = () => NextResponse.json({ error: 'La recette de paiement est
 
 export async function createPhysicalPilotCheckout(
   client: UserDb,
-  listing: { id: string; item_id: string; user_id: string; title: string },
+  listing: { id: string; item_id: string; user_id: string; title: string; fee_policy: string },
   buyerId: string,
   quote: CommissionBreakdown,
   address: Address,
@@ -23,7 +24,8 @@ export async function createPhysicalPilotCheckout(
   if (!origin || !await canUsePhysicalSalePilot(client) || address.country !== 'FR') {
     return NextResponse.json({ error: 'Ce paiement de recette est réservé aux participants qualifiés en France.' }, { status: 403 });
   }
-  if (quote.policy !== PHYSICAL_PILOT_POLICY || !quote.itemCents || !quote.buyerFeeCents) return unavailable();
+  const policy = listing.fee_policy;
+  if (!isPhysicalPilotPolicy(policy) || quote.policy !== policy || !quote.itemCents || !quote.buyerFeeCents) return unavailable();
 
   const service = createServiceClient();
   const { data: seller, error: sellerError } = await service.from('profiles')
@@ -42,7 +44,7 @@ export async function createPhysicalPilotCheckout(
 
   const { data: inserted, error } = await client.from('marketplace_orders').insert({
     annonce_id: listing.id, item_id: listing.item_id, buyer_id: buyerId, seller_id: listing.user_id,
-    fee_policy: PHYSICAL_PILOT_POLICY, item_amount_cents: quote.itemCents, buyer_fee_cents: quote.buyerFeeCents,
+    fee_policy: policy, item_amount_cents: quote.itemCents, buyer_fee_cents: quote.buyerFeeCents,
     amount_cents: quote.grossCents, commission_pct: 0, commission_amount_cents: 0, net_amount_cents: quote.netCents,
     status: 'pending', escrow_status: 'none', shipping_address: address,
   }).select(orderColumns).single();
@@ -55,7 +57,7 @@ export async function createPhysicalPilotCheckout(
     const addressMatches = prior && Object.keys({ ...address, ...prior.shipping_address }).every(
       key => prior.shipping_address?.[key] === address[key as keyof Address],
     );
-    if (!prior || prior.fee_policy !== PHYSICAL_PILOT_POLICY || prior.item_amount_cents !== quote.itemCents ||
+    if (!prior || prior.fee_policy !== policy || prior.item_amount_cents !== quote.itemCents ||
         prior.buyer_fee_cents !== quote.buyerFeeCents || prior.amount_cents !== quote.grossCents || !addressMatches) {
       return NextResponse.json({ error: 'Une commande existe déjà pour cet objet. Consulte tes commandes.' }, { status: 409 });
     }
@@ -67,7 +69,7 @@ export async function createPhysicalPilotCheckout(
   }
   if (!order) return unavailable();
 
-  const metadata = { app_slug: 'tyaga', order_id: order.id, buyer_id: buyerId, seller_id: listing.user_id, fee_policy: PHYSICAL_PILOT_POLICY };
+  const metadata = { app_slug: 'tyaga', order_id: order.id, buyer_id: buyerId, seller_id: listing.user_id, fee_policy: policy };
   try {
     // If the first response was lost, use the same parameters and Stripe key.
     // Beyond its retention window, never create a second provider session.
@@ -94,7 +96,7 @@ export async function createPhysicalPilotCheckout(
     if (!order.stripe_checkout_session_id) {
       const { data: saved, error: saveError } = await service.from('marketplace_orders')
         .update({ stripe_checkout_session_id: session.id }).eq('id', order.id)
-        .eq('status', 'pending').eq('fee_policy', PHYSICAL_PILOT_POLICY)
+        .eq('status', 'pending').eq('fee_policy', policy)
         .select('id').maybeSingle();
       if (saveError || !saved) return unavailable();
     }

@@ -8,7 +8,8 @@ import {
   USER_ACTIONS,
   type OrderStatus,
 } from '@/lib/order-transitions';
-import { hasPhysicalTestStripeKey, PHYSICAL_PILOT_POLICY } from '@/lib/physical-sale-pilot';
+import { isPhysicalPilotPolicy } from '@/lib/physical-fee-policy';
+import { hasPhysicalTestStripeKey } from '@/lib/physical-sale-pilot';
 import { rateLimit } from '@/lib/rate-limit';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
@@ -81,7 +82,7 @@ export async function POST(
     );
   }
 
-  const pilot = order.fee_policy === PHYSICAL_PILOT_POLICY;
+  const pilot = isPhysicalPilotPolicy(order.fee_policy);
   if (pilot && !hasPhysicalTestStripeKey()) {
     return NextResponse.json({ error: 'Cette commande de test requiert le prestataire de recette.' }, { status: 503 });
   }

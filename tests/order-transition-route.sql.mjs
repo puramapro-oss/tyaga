@@ -5,7 +5,8 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import { database, ids, storeFor, transfersFor } from './settlement-db.mjs';
 import { finalizeCompletedSale } from '../src/lib/order-settlement.ts';
-import { PHYSICAL_PILOT_POLICY } from '../src/lib/physical-sale-pilot.ts';
+import * as feePolicy from '../src/lib/physical-fee-policy.ts';
+const { PHYSICAL_PILOT_POLICY, PHYSICAL_PILOT_POLICIES } = feePolicy;
 import * as transitions from '../src/lib/order-transitions.ts';
 
 const require = createRequire(import.meta.url);
@@ -20,7 +21,7 @@ async function app(t, options = {}) {
   const db = await database({ status: 'shipped', ...options });
   t.after(() => db.close());
   await db.exec("ALTER TABLE tyaga.marketplace_orders ADD COLUMN fee_policy text NOT NULL DEFAULT 'legacy'");
-  if (options.pilot) await db.query('UPDATE tyaga.marketplace_orders SET fee_policy=$1',[PHYSICAL_PILOT_POLICY]);
+  if (options.pilot) await db.query('UPDATE tyaga.marketplace_orders SET fee_policy=$1',[options.pilot === true ? PHYSICAL_PILOT_POLICY : options.pilot]);
   const start = originalSchema.indexOf('DROP POLICY IF EXISTS orders_select');
   const end = originalSchema.indexOf('-- VENTES :', start);
   const freezeStart = originalSchema.indexOf('CREATE OR REPLACE FUNCTION tyaga.tg_orders_freeze()');
@@ -69,7 +70,8 @@ async function app(t, options = {}) {
     'next/server': { NextResponse }, zod: require('zod'),
     '@/lib/order-settlement': { finalizeCompletedSale },
     '@/lib/order-transitions': transitions,
-    '@/lib/physical-sale-pilot': { PHYSICAL_PILOT_POLICY, hasPhysicalTestStripeKey: () => options.testKey === true },
+    '@/lib/physical-fee-policy': feePolicy,
+    '@/lib/physical-sale-pilot': { hasPhysicalTestStripeKey: () => options.testKey === true },
     '@/lib/rate-limit': { rateLimit: () => ({ ok: !options.rateLimited, retryAfterSec: 60 }) },
     '@/lib/service': { createServiceClient: () => { calls.service++; return store; } },
     '@/lib/supabase-server': { createServerSupabaseClient: async () => authClient },
@@ -158,8 +160,8 @@ test('seller shipping keeps its existing path and performs no finalization', asy
 
 
 for (const [action,status] of [['cancel','pending'], ['deliver','shipped'], ['deliver','delivered'], ['deliver','completed']]) {
-  test(`une commande pilote ne peut pas ${action} depuis ${status} sous une clé de production`, async t => {
-    const a = await app(t, { pilot: true, testKey: false, status });
+  for (const policy of PHYSICAL_PILOT_POLICIES) test(`une commande ${policy} ne peut pas ${action} depuis ${status} sous une clé de production`, async t => {
+    const a = await app(t, { pilot: policy, testKey: false, status });
     await a.db.exec("UPDATE tyaga.marketplace_orders SET stripe_checkout_session_id='cs_test_order'");
     assert.equal((await a.post(action)).status,503);
     assert.equal((await a.db.query('SELECT status FROM tyaga.marketplace_orders')).rows[0].status, status);

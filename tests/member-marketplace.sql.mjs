@@ -37,6 +37,13 @@ test('TYAGA installe son schéma complet et ses extensions sur une base vierge',
         await db.exec(await read('tests/' + name + '.integration.sql'));
       });
     }
+    await suite.test('physical-sale-fee-v3 conserve les contrats antérieurs et facture le nouveau tarif', async () => {
+      await db.exec(await read('tests/physical-sale-fee-v3-before.integration.sql'));
+      const migration = await read('sql/physical-sale-fee-v3.sql');
+      await db.exec(migration);
+      await db.exec(migration);
+      await db.exec(await read('tests/physical-sale-fee-v3.integration.sql'));
+    });
   } finally {
     await db.close();
   }

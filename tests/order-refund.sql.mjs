@@ -6,8 +6,9 @@ import vm from 'node:vm';
 import { database, ids, storeFor, transfersFor } from './settlement-db.mjs';
 import { finalizeCompletedSale } from '../src/lib/order-settlement.ts';
 import { refundCompletedSale } from '../src/lib/order-refund.ts';
-import { checkPilotCheckout, checkPilotRefund } from '../src/lib/physical-pilot-receipt.ts';
-import { PHYSICAL_PILOT_POLICY } from '../src/lib/physical-sale-pilot.ts';
+import { checkPilotCheckout, checkPilotPaymentIntent, checkPilotRefund } from '../src/lib/physical-pilot-receipt.ts';
+import * as feePolicy from '../src/lib/physical-fee-policy.ts';
+const { PHYSICAL_PILOT_POLICIES, PREVIOUS_PHYSICAL_PILOT_POLICY, PHYSICAL_PILOT_POLICY } = feePolicy;
 import { orderPaymentLabel } from '../src/lib/order-payment-label.ts';
 
 const charge = { id: 'ch_test', payment_intent: 'pi_test', amount: 10000,
@@ -71,6 +72,7 @@ async function app(t, options = {}, faults = {}) {
       const query = {
         select() { return query; }, update(value) { update = value; return query; },
         eq(key, value) { assert.ok(['id','order_id','status','stripe_payment_intent_id','stripe_checkout_session_id','fee_policy'].includes(key)); filters.push([key,value]); return query; },
+        in(key, values) { assert.equal(key, 'fee_policy'); filters.push([key, [...values]]); return query; },
         async maybeSingle() { const result = await execute(); return { ...result, data: result.data?.[0] ?? null }; },
         then(resolve, reject) { return execute().then(resolve, reject); },
       };
@@ -84,7 +86,7 @@ async function app(t, options = {}, faults = {}) {
             assert.ok(['status','escrow_status','stripe_payment_intent_id','updated_at'].includes(key));
             values.push(value); return `${key}=$${values.length}`;
           }).join(',');
-          const where = filters.map(([key,value]) => { values.push(value); return `${key}=$${values.length}`; }).join(' AND ');
+          const where = filters.map(([key,value]) => { values.push(value); return Array.isArray(value) ? `${key}=ANY($${values.length}::text[])` : `${key}=$${values.length}`; }).join(' AND ');
           const sql = update ? `UPDATE tyaga.${table} SET ${sets} WHERE ${where} RETURNING *`
             : `SELECT * FROM tyaga.${table} WHERE ${where}`;
           return { data: (await db.query(sql, values)).rows, error: null };
@@ -104,13 +106,16 @@ async function app(t, options = {}, faults = {}) {
   const bindings = {
     'next/server': { NextResponse }, '@/lib/order-refund': { refundCompletedSale },
     '@/lib/digital-checkout-test': { handleDigitalTestEvent: async () => false },
-    '@/lib/physical-sale-pilot': { PHYSICAL_PILOT_POLICY, hasPhysicalTestStripeKey: () => options.testKey === true },
+    '@/lib/physical-fee-policy': feePolicy,
+    '@/lib/physical-sale-pilot': { hasPhysicalTestStripeKey: () => options.testKey === true },
     '@/lib/physical-pilot-receipt': {
       checkPilotCheckout: (...args) => checkPilotCheckout(...args, options.testKey === true),
+      checkPilotPaymentIntent: (...args) => checkPilotPaymentIntent(...args, options.testKey === true),
       checkPilotRefund: (...args) => checkPilotRefund(...args, options.testKey === true),
     },
     '@/lib/service': { createServiceClient: () => webhookStore },
-    '@/lib/stripe': { getStripe: () => ({ transfers: getTransfers(), refunds: {
+    '@/lib/stripe': { getStripe: () => ({ transfers: getTransfers(),
+      paymentIntents: { async retrieve(id) { assert.equal(id, 'pi_test'); return options.intent; } }, refunds: {
       async create(args) { orphanRefunds.push(args); return { id: 're_orphan', status: 'succeeded' }; },
     }, webhooks: {
       constructEvent(payload, signature) { assert.equal(signature, 'test-signature'); return JSON.parse(payload); },
@@ -364,24 +369,43 @@ test('a failed order read during checkout replay never proves an orphan payment'
 });
 
 
-test('le pilote physique ne crédite que la session de recette liée, puis rapproche un remboursement', async t => {
-  const a = await app(t, { settle: false, testKey: true });
-  await a.db.exec("UPDATE tyaga.marketplace_orders SET fee_policy='fr_p2p_test_v2', status='pending', escrow_status='none',stripe_checkout_session_id='cs_attendue',stripe_payment_intent_id=NULL");
-  const metadata = { app_slug: 'tyaga', fee_policy: PHYSICAL_PILOT_POLICY, order_id: ids.order, buyer_id: ids.buyer, seller_id: ids.seller };
-  const session = { id: 'cs_attendue', client_reference_id:ids.order, mode: 'payment', amount_total:10000, currency:'eur', status:'complete',
+for (const policy of PHYSICAL_PILOT_POLICIES) test(`session, capture et remboursement vérifient le même contrat ${policy}`, async t => {
+  const total = policy === PREVIOUS_PHYSICAL_PILOT_POLICY ? 5180 : 5185;
+  const otherPolicy = policy === PREVIOUS_PHYSICAL_PILOT_POLICY ? PHYSICAL_PILOT_POLICY : PREVIOUS_PHYSICAL_PILOT_POLICY;
+  const priorTotal = total === 5180 ? 5185 : 5180;
+  const options = { settle:false, testKey:true };
+  const a = await app(t, options);
+  await a.db.query(`UPDATE tyaga.marketplace_orders SET fee_policy=$1,amount_cents=$2,net_amount_cents=5000,commission_amount_cents=0, status='pending', escrow_status='none',stripe_checkout_session_id='cs_attendue',stripe_payment_intent_id=NULL`, [policy,total]);
+  const metadata = { app_slug: 'tyaga', fee_policy: policy, order_id: ids.order, buyer_id: ids.buyer, seller_id: ids.seller };
+  const session = { id: 'cs_attendue', client_reference_id:ids.order, mode: 'payment', amount_total:total, currency:'eur', status:'complete',
     payment_status:'paid', livemode:false, payment_intent:'pi_test', metadata };
+  const capture = { id:'pi_test', amount:total, amount_received:total, status:'succeeded', currency:'eur', metadata, livemode:false };
+  options.intent=capture;
   const send = (payload, type='checkout.session.completed', live=false) => a.webhook(payload, 'evt_pilot', type, live);
   for (const invalid of [
     { id:'cs_other' }, { client_reference_id:ids.stranger }, { amount_total:9999 }, { currency:'usd' }, { payment_status:'unpaid' },
+    { metadata:{...metadata, fee_policy:otherPolicy} }, { amount_total:priorTotal },
     { metadata:{...metadata, fee_policy:'legacy'} }, { metadata:{...metadata, order_id:ids.stranger, fee_policy:'legacy'} },
     { metadata:{...metadata, buyer_id:ids.stranger} }, { metadata:{...metadata, seller_id:ids.stranger} }, { livemode:true },
   ]) assert.equal((await send({...session,...invalid})).status,500);
   assert.equal((await send(session,'checkout.session.completed',true)).status,500);
   assert.equal((await send(session,'checkout.session.expired')).status,500);
   assert.equal((await a.snapshot()).order.status,'pending'); assert.equal(a.processed.has('evt_pilot'),false);
+  for (const change of [{metadata:{...metadata,fee_policy:otherPolicy}},{metadata:{...metadata,buyer_id:ids.stranger}},
+    {id:'pi_other'},{amount:priorTotal},{amount_received:total-1},{status:'processing'},{currency:'usd'},{livemode:true}]) {
+    options.intent={...capture,...change};
+    assert.equal((await send(session)).status,500);
+    assert.equal((await a.snapshot()).order.status,'pending');
+  }
+  options.intent=capture;
   assert.equal((await send(session)).status,200);
   assert.equal((await a.snapshot()).order.status,'paid');
-  const refund = {...charge, metadata, livemode:false};
+  const refund = {...charge, amount:total, amount_refunded:total, metadata, livemode:false};
+  assert.equal((await a.webhook({...refund,metadata:{...metadata,fee_policy:otherPolicy}},'evt_cross_contract')).status,500);
+  assert.equal((await a.webhook({...refund,currency:'usd'},'evt_other_currency')).status,500);
+  options.intent={...capture,metadata:{...metadata,fee_policy:otherPolicy}};
+  assert.equal((await a.webhook(refund,'evt_mismatched_capture')).status,500);
+  options.intent=capture;
   assert.equal((await a.webhook({...refund, metadata:{app_slug:'tyaga'}}, 'evt_bad_refund')).status,500);
   assert.equal((await a.webhook({...refund, livemode:true}, 'evt_live_refund')).status,500);
   assert.equal((await a.snapshot()).order.status,'paid');
@@ -389,10 +413,10 @@ test('le pilote physique ne crédite que la session de recette liée, puis rappr
   assert.equal((await a.snapshot()).order.escrow_status,'refunded');
 });
 
-test('un changement de clé gèle les expire et refund du pilote avant toute opération', async t => {
+for (const policy of PHYSICAL_PILOT_POLICIES) test(`clé live interdite avant expiration ou remboursement ${policy}`, async t => {
   const a=await app(t,{settle:false,testKey:false});
-  await a.db.exec("UPDATE tyaga.marketplace_orders SET fee_policy='fr_p2p_test_v2',status='pending',escrow_status='none',stripe_checkout_session_id='cs_attendue'");
-  const metadata = {app_slug:'tyaga',fee_policy:PHYSICAL_PILOT_POLICY,order_id:ids.order,buyer_id:ids.buyer,seller_id:ids.seller};
+  await a.db.query("UPDATE tyaga.marketplace_orders SET fee_policy=$1,status='pending',escrow_status='none',stripe_checkout_session_id='cs_attendue'",[policy]);
+  const metadata = {app_slug:'tyaga',fee_policy:policy,order_id:ids.order,buyer_id:ids.buyer,seller_id:ids.seller};
   const expired={id:'cs_attendue',client_reference_id:ids.order,mode:'payment',status:'expired',payment_status:'unpaid',livemode:false,amount_total:10000,currency:'eur',metadata};
   assert.equal((await a.webhook(expired,'evt_block_expire','checkout.session.expired')).status,500);
   assert.equal((await a.webhook({...charge,metadata,livemode:false},'evt_block_refund')).status,500);

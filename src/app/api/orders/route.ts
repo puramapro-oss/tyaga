@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { createPhysicalPilotCheckout } from '@/lib/physical-pilot-checkout';
-import { PHYSICAL_PILOT_POLICY } from '@/lib/physical-sale-pilot';
+import { isPhysicalPilotPolicy } from '@/lib/physical-fee-policy';
 import { physicalOrderQuote, sameSaleQuote } from '@/lib/physical-order-quote';
 import { expectedSaleQuote } from '@/lib/sale-quote-input';
 import { rateLimit } from '@/lib/rate-limit';
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   if (!quote) {
     return NextResponse.json({ error: 'Impossible de vérifier le prix convenu. Réessaie.' }, { status: 503 });
   }
-  const pilot = annonce.fee_policy === PHYSICAL_PILOT_POLICY;
+  const pilot = isPhysicalPilotPolicy(annonce.fee_policy);
   if ((pilot && !parsed.data.expectedQuote) || (parsed.data.expectedQuote && !sameSaleQuote(parsed.data.expectedQuote, quote))) {
     return NextResponse.json({
       error: 'Les montants ont changé. Vérifie le nouveau détail avant de confirmer.',

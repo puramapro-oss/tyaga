@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 
 import SaleFeeSummary from '@/components/marketplace/SaleFeeSummary';
 import type { CommissionBreakdown } from '@/lib/commission';
+import { isPhysicalPilotPolicy } from '@/lib/physical-fee-policy';
 
 /**
  * EX-D — annonce assistée. Génération (brouillon IA montré AVANT publication,
@@ -88,7 +89,7 @@ export default function AnnoncePanel({
           description: draft.description,
           tags: draft.tags,
           expectedQuote: selectedQuote,
-          ...(selectedQuote.policy === 'fr_p2p_test_v2' ? { feePolicy: selectedQuote.policy } : {}),
+          ...(isPhysicalPilotPolicy(selectedQuote.policy) ? { feePolicy: selectedQuote.policy } : {}),
           userValidated: true, // la case cochée est la seule voie vers true
         }),
         signal: AbortSignal.timeout(30_000),

@@ -5,8 +5,9 @@ import { notFound } from 'next/navigation';
 import ContactButton from '@/components/inbox/ContactButton';
 import BuyPanel from '@/components/marketplace/BuyPanel';
 import SaleFeeSummary from '@/components/marketplace/SaleFeeSummary';
-import { canUsePhysicalSalePilot, PHYSICAL_PILOT_POLICY } from '@/lib/physical-sale-pilot';
-import { computeCommission, physicalPilotQuote } from '@/lib/commission';
+import { isPhysicalPilotPolicy } from '@/lib/physical-fee-policy';
+import { canUsePhysicalSalePilot } from '@/lib/physical-sale-pilot';
+import { physicalListingQuote } from '@/lib/commission';
 import { physicalOrderQuote } from '@/lib/physical-order-quote';
 import DigitalLicensePanel from '@/components/marketplace/DigitalLicensePanel';
 import ListingMatches from '@/components/marketplace/ListingMatches';
@@ -92,10 +93,11 @@ export default async function AnnoncePage({
   const wanted = row.listing_intent === 'wanted';
   const rental = row.listing_mode === 'rental';
   const physicalCheckout = row.asset_kind === 'physical' && row.listing_intent === 'offer' && row.listing_mode === 'sale';
-  const pilot = row.fee_policy === PHYSICAL_PILOT_POLICY;
+  const policy = row.fee_policy;
+  const pilot = isPhysicalPilotPolicy(policy);
   const pilotAvailable = !pilot || await canUsePhysicalSalePilot(supabase);
   const quote = physicalCheckout && user && pilotAvailable
-    ? (isOwner ? (pilot ? physicalPilotQuote(row.price_cents) : computeCommission(row.price_cents))
+    ? (isOwner ? physicalListingQuote(row.price_cents, policy)
       : await physicalOrderQuote(supabase, row, user.id))
     : null;
   const related = new URLSearchParams({ kind: row.asset_kind, mode: row.listing_mode, intent: wanted ? 'offer' : 'wanted' });

@@ -1,9 +1,10 @@
 import 'server-only';
 
 import { APP_DOMAIN } from './constants';
+import { PHYSICAL_PILOT_POLICY } from './physical-fee-policy';
 import type { createServerSupabaseClient } from './supabase-server';
 
-export const PHYSICAL_PILOT_POLICY = 'fr_p2p_test_v2' as const;
+export { PHYSICAL_PILOT_POLICY } from './physical-fee-policy';
 
 export function hasPhysicalTestStripeKey(): boolean {
   return process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_') === true &&
@@ -31,4 +32,10 @@ export async function canUsePhysicalSalePilot(client: Awaited<ReturnType<typeof 
   if (!isPhysicalPilotTestMode()) return false;
   const { data, error } = await client.rpc('can_publish_test_fee');
   return !error && data === true;
+}
+
+export async function canPublishCurrentPhysicalSalePilot(client: Awaited<ReturnType<typeof createServerSupabaseClient>>) {
+  if (!isPhysicalPilotTestMode()) return false;
+  const { data, error } = await client.rpc('current_test_fee_policy');
+  return !error && data === PHYSICAL_PILOT_POLICY;
 }

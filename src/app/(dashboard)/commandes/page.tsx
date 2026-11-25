@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import CommandeActions from '@/components/marketplace/CommandeActions';
 import PackingChecklist from '@/components/marketplace/PackingChecklist';
+import { isPhysicalPilotPolicy, physicalBuyerFeePercentLabel } from '@/lib/physical-fee-policy';
 import { orderPaymentLabel } from '@/lib/order-payment-label';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { formatDate, formatPrice } from '@/lib/utils';
@@ -137,8 +138,8 @@ export default async function CommandesPage({
               <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-foreground-secondary">
                 <span>{formatDate(o.created_at)}</span>
                 <span className="font-mono">{formatPrice(o.amount_cents)}</span>
-                {o.fee_policy === 'fr_p2p_test_v2' && o.item_amount_cents !== null && o.buyer_fee_cents !== null && (
-                  <span>Recette France · article {formatPrice(o.item_amount_cents)} · frais acheteur {formatPrice(o.buyer_fee_cents)}</span>
+                {isPhysicalPilotPolicy(o.fee_policy) && o.item_amount_cents !== null && o.buyer_fee_cents !== null && (
+                  <span>Recette France · article {formatPrice(o.item_amount_cents)} · frais acheteur {formatPrice(o.buyer_fee_cents)} ({physicalBuyerFeePercentLabel(o.fee_policy)} % + 0,35 €)</span>
                 )}
                 {o.role === 'seller' && (
                   <span>

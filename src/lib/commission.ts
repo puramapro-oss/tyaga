@@ -1,10 +1,10 @@
 import 'server-only';
 
 import { commissionPct } from './constants';
-import { PHYSICAL_PILOT_POLICY } from './physical-sale-pilot';
+import { PHYSICAL_PILOT_POLICY, isPhysicalPilotPolicy, physicalBuyerFeeCents, type PhysicalPilotPolicy } from './physical-fee-policy';
 
 export interface CommissionBreakdown {
-  policy?: typeof PHYSICAL_PILOT_POLICY;
+  policy?: PhysicalPilotPolicy;
   itemCents?: number;
   buyerFeeCents?: number;
   /** Prix affiché acheteur (centimes). */
@@ -33,12 +33,17 @@ export function computeCommission(grossCents: number): CommissionBreakdown {
   };
 }
 
-
-export function physicalPilotQuote(itemCents: number): CommissionBreakdown | null {
+export function physicalPilotQuote(itemCents: number, policy: PhysicalPilotPolicy = PHYSICAL_PILOT_POLICY): CommissionBreakdown | null {
   if (!Number.isSafeInteger(itemCents) || itemCents <= 0 || itemCents > 2_147_483_647) return null;
-  const buyerFeeCents = Math.round(itemCents * 29 / 1000) + 35;
+  const buyerFeeCents = physicalBuyerFeeCents(itemCents, policy);
   const grossCents = itemCents + buyerFeeCents;
   if (grossCents < 50 || grossCents > 2_147_483_647) return null;
-  return { policy: PHYSICAL_PILOT_POLICY, grossCents, itemCents, buyerFeeCents,
+  return { policy, grossCents, itemCents, buyerFeeCents,
     commissionPct: 0, commissionCents: 0, netCents: itemCents };
+}
+
+export function physicalListingQuote(itemCents: number, policy?: string) {
+  if (isPhysicalPilotPolicy(policy)) return physicalPilotQuote(itemCents, policy);
+  if (policy === undefined || policy === 'legacy') return computeCommission(itemCents);
+  return null;
 }

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { computeCommission, physicalPilotQuote } from '@/lib/commission';
 import { CONDITION_LABELS } from '@/lib/labels';
-import { canUsePhysicalSalePilot } from '@/lib/physical-sale-pilot';
+import { canPublishCurrentPhysicalSalePilot } from '@/lib/physical-sale-pilot';
 import { generateListing } from '@/lib/listing-ai';
 import { rateLimit } from '@/lib/rate-limit';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
@@ -110,6 +110,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     draft: { ...draft, price_cents: estimation.price_suggested_cents,
       quote: computeCommission(estimation.price_suggested_cents),
-      pilotQuote: await canUsePhysicalSalePilot(supabase) ? physicalPilotQuote(estimation.price_suggested_cents) : null },
+      pilotQuote: await canPublishCurrentPhysicalSalePilot(supabase) ? physicalPilotQuote(estimation.price_suggested_cents) : null },
   });
 }

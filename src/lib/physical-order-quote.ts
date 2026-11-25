@@ -1,5 +1,4 @@
-import { computeCommission, physicalPilotQuote, type CommissionBreakdown } from './commission';
-import { PHYSICAL_PILOT_POLICY } from './physical-sale-pilot';
+import { physicalListingQuote, type CommissionBreakdown } from './commission';
 import type { createServerSupabaseClient } from './supabase-server';
 
 export interface NegotiationMessage {
@@ -29,12 +28,10 @@ export async function physicalOrderQuote(
   listing: { id: string; user_id: string; price_cents: number; fee_policy?: string },
   buyerId: string,
 ): Promise<CommissionBreakdown | null> {
-  if (listing.fee_policy && listing.fee_policy !== PHYSICAL_PILOT_POLICY && listing.fee_policy !== 'legacy') return null;
-  const compute = listing.fee_policy === PHYSICAL_PILOT_POLICY ? physicalPilotQuote : computeCommission;
   const { data: conversation, error } = await client.from('conversations').select('id')
     .eq('annonce_id', listing.id).eq('buyer_id', buyerId).maybeSingle();
   if (error) return null;
-  if (!conversation) return compute(listing.price_cents);
+  if (!conversation) return physicalListingQuote(listing.price_cents, listing.fee_policy);
 
   const latestOffer = (senderId: string) => client.from('inbox_messages')
     .select('offer_cents, created_at').eq('conversation_id', conversation.id)
@@ -42,5 +39,5 @@ export async function physicalOrderQuote(
     .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(1).maybeSingle();
   const [offered, accepted] = await Promise.all([latestOffer(buyerId), latestOffer(listing.user_id)]);
   if (offered.error || accepted.error) return null;
-  return compute(agreedSalePrice(listing.price_cents, offered.data, accepted.data));
+  return physicalListingQuote(agreedSalePrice(listing.price_cents, offered.data, accepted.data), listing.fee_policy);
 }

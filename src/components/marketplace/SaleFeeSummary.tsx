@@ -1,8 +1,10 @@
 import type { CommissionBreakdown } from '@/lib/commission';
+import { isPhysicalPilotPolicy, physicalBuyerFeePercentLabel } from '@/lib/physical-fee-policy';
 import { formatPrice } from '@/lib/utils';
 
 export default function SaleFeeSummary({ quote }: { quote: CommissionBreakdown }) {
-  const pilot = quote.policy === 'fr_p2p_test_v2';
+  const { policy } = quote;
+  const pilot = isPhysicalPilotPolicy(policy);
   return (
     <dl aria-label="Détail du prix de vente" className="grid gap-2 rounded-md border border-border p-4 text-sm">
       {pilot && (
@@ -11,7 +13,7 @@ export default function SaleFeeSummary({ quote }: { quote: CommissionBreakdown }
             <dt>Prix de l’objet</dt><dd className="font-mono">{formatPrice(quote.itemCents!)}</dd>
           </div>
           <div className="flex flex-wrap justify-between gap-x-3">
-            <dt>Frais acheteur</dt><dd className="font-mono">{formatPrice(quote.buyerFeeCents!)}</dd>
+            <dt>Frais acheteur ({physicalBuyerFeePercentLabel(policy)} % + 0,35 €)</dt><dd className="font-mono">{formatPrice(quote.buyerFeeCents!)}</dd>
           </div>
         </>
       )}

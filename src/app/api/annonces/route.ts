@@ -3,7 +3,8 @@ import { z } from 'zod';
 
 import { computeCommission, physicalPilotQuote } from '@/lib/commission';
 import { sameSaleQuote } from '@/lib/physical-order-quote';
-import { canUsePhysicalSalePilot, PHYSICAL_PILOT_POLICY } from '@/lib/physical-sale-pilot';
+import { PHYSICAL_PILOT_POLICY, PREVIOUS_PHYSICAL_PILOT_POLICY } from '@/lib/physical-fee-policy';
+import { canPublishCurrentPhysicalSalePilot } from '@/lib/physical-sale-pilot';
 import { expectedSaleQuote } from '@/lib/sale-quote-input';
 import { buildExportText } from '@/lib/listing';
 import { rateLimit } from '@/lib/rate-limit';
@@ -18,7 +19,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server';
 const bodySchema = z.object({
   itemId: z.string().uuid(),
   expectedQuote: expectedSaleQuote,
-  feePolicy: z.enum(['legacy', PHYSICAL_PILOT_POLICY]).optional(),
+  feePolicy: z.enum(['legacy', PREVIOUS_PHYSICAL_PILOT_POLICY, PHYSICAL_PILOT_POLICY]).optional(),
   title: z.string().trim().min(3).max(70),
   description: z.string().trim().min(20).max(1200),
   tags: z.array(z.string().trim().min(2).max(24)).max(5),
@@ -67,6 +68,10 @@ export async function POST(request: Request) {
     );
   }
 
+  if (parsed.data.feePolicy === PREVIOUS_PHYSICAL_PILOT_POLICY) {
+    return NextResponse.json({ error: 'Le tarif des nouvelles annonces a changé. Régénère le brouillon avant de publier.' }, { status: 409 });
+  }
+
   // RLS client : lecture possible uniquement si propriétaire
   const { data: item } = await supabase
     .from('items')
@@ -101,7 +106,7 @@ export async function POST(request: Request) {
   }
 
   const pilot = parsed.data.feePolicy === PHYSICAL_PILOT_POLICY;
-  if (pilot && !(await canUsePhysicalSalePilot(supabase))) {
+  if (pilot && !(await canPublishCurrentPhysicalSalePilot(supabase))) {
     return NextResponse.json({ error: 'Ce compte ne peut pas publier au tarif de recette.' }, { status: 403 });
   }
   const quote = pilot ? physicalPilotQuote(estimation.price_suggested_cents) : computeCommission(estimation.price_suggested_cents);

@@ -2,16 +2,25 @@
 
 import { useState } from 'react';
 import { listingPreviewSummary, previewTokenPattern, type ReviewedListing } from '@/lib/listing-preview';
+import ShareListing from './ShareListing';
 
 type Action = 'read' | 'enable' | 'revoke';
-export function PublicListingPreview({ id, ...listing }: ReviewedListing & { id: string }) {
+type PreviewProps = ReviewedListing & { id: string };
+
+export function PublicListingPreview(props: PreviewProps) {
+  const { id, title, priceCents, kind, intent, mode } = props;
+  return <PreviewSettings key={JSON.stringify([id, title, priceCents, kind, intent, mode])} {...props} />;
+}
+
+function PreviewSettings({ id, ...listing }: PreviewProps) {
   const [consent, setConsent] = useState(false);
   const [pending, setPending] = useState(false);
-  const [address, setAddress] = useState('');
+  const [token, setToken] = useState('');
   const [message, setMessage] = useState('');
 
   async function manage(action: Action) {
     setPending(true);
+    setToken('');
     setMessage('');
     try {
       const response = await fetch(`/api/annonces/${id}/partage`, {
@@ -21,14 +30,14 @@ export function PublicListingPreview({ id, ...listing }: ReviewedListing & { id:
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Service indisponible.');
       const prefix = '/api/annonces/apercu/';
-      let url = '';
+      let nextToken = '';
       if (body.path !== null) {
         if (typeof body.path !== 'string' || !body.path.startsWith(prefix) || !previewTokenPattern.test(body.path.slice(prefix.length))) throw new Error('Lien indisponible.');
-        url = new URL(body.path, window.location.origin).href;
+        nextToken = body.path.slice(prefix.length);
       }
-      setAddress(url);
+      setToken(nextToken);
       if (action === 'revoke') setConsent(false);
-      setMessage(action === 'revoke' ? 'Lien révoqué.' : url ? 'Lien public disponible.' : 'Aucun aperçu public actif.');
+      setMessage(action === 'revoke' ? 'Lien révoqué.' : nextToken ? 'Lien public disponible.' : 'Aucun aperçu public actif.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Service indisponible.'); }
     finally { setPending(false); }
   }
@@ -43,7 +52,10 @@ export function PublicListingPreview({ id, ...listing }: ReviewedListing & { id:
         <button className="link-action" type="button" disabled={pending} onClick={() => manage('read')}>Retrouver mon lien</button>
         <button className="link-action" type="button" disabled={pending} onClick={() => manage('revoke')}>Révoquer le lien</button>
       </div>
-      {address && <label className="grid gap-1">Lien public à partager<input aria-label="Lien public à partager" readOnly value={address} onFocus={e=>e.currentTarget.select()} className="w-full min-w-0 border border-border p-2 bg-background" /></label>}
+      {token && <>
+        <label className="grid gap-1">Lien public à partager<input aria-label="Lien public à partager" readOnly value={new URL(`/api/annonces/apercu/${token}`, window.location.origin).href} onFocus={e=>e.currentTarget.select()} className="w-full min-w-0 border border-border p-2 bg-background" /></label>
+        <ShareListing previewToken={token} title={listing.title} />
+      </>}
       <p role="status">{message}</p>
     </div>
   </details>;

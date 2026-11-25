@@ -16,6 +16,7 @@ Les extensions s’appliquent à la base PostgreSQL de TYAGA sur une version inc
 8. licensed-files.sql
 9. promotion-points-pilot.sql
 10. published-listing-benefits.sql
+11. physical-sale-fee-v3.sql
 
 Après installation recharger le cache de schéma PostgREST avec `NOTIFY pgrst, 'reload schema';`. Exécuter les régressions sur une base jetable. Les contrôles d’intégration sous PGlite se lancent avec `npm run test:member-marketplace`. La recette de concurrence native utilise `tests/listing-promotion-concurrency.mjs`, le pilote pg et deux connexions PostgreSQL indépendantes.
 
@@ -35,7 +36,11 @@ Une campagne active de `tyaga_promotion.publication_campaigns` peut offrir un bo
 
 ## Tarif physique de recette
 
-Le tarif historique des annonces existantes est conservé. Le pilote français permet à deux comptes particuliers de test qualifiés de valider un prix produit, des frais acheteur de 2,9 % + 0,35 € et un net vendeur égal au prix produit. Le vendeur choisit ce tarif avant publication. L’acheteur reconfirme le total lorsqu’un accord négocié change. Les commandes de test distinguent le prix produit des frais acheteur, restent exclues des avantages réels et du parrainage. Pour une recette isolée, renseigner une origine dédiée dans `TYAGA_PHYSICAL_FEE_TEST_ORIGIN` et `TYAGA_PHYSICAL_FEE_TEST=1`, avec les clés Stripe de test et des profils de test FR qualifiés dans `tyaga_fee.pilot_sellers`. À 50 € de prix produit, le total acheteur est de 51,80 € et le net vendeur de 50 €. Aucun résultat de recette n’autorise un règlement en production.
+Le vendeur qui choisit le nouveau tarif français pour une annonce physique de recette reçoit le prix convenu. L’acheteur paie 3 % du prix de l’article, arrondis au centime, plus 0,35 €. À 50 € de prix produit, il paie 51,85 € hors livraison et le vendeur reçoit 50 €. Le système présente le nouveau total à confirmer si la négociation modifie le prix. Un remboursement intégral porte sur le total débité.
+
+Le tarif est fixé à la création de l’annonce. Les annonces antérieures marquées `fr_p2p_test_v2` conservent 2,9 % + 0,35 € pour leurs achats et remboursements. Les nouveaux contrats du pilote utilisent `fr_p2p_test_v3`. La migration V3 s’applique après V2. Sur une base déjà en V3, les mises à jour reprennent à partir de la dernière migration appliquée.
+
+Pour tester, utiliser deux comptes de particuliers français qualifiés dans `tyaga_fee.pilot_sellers`, une origine de recette dédiée dans `TYAGA_PHYSICAL_FEE_TEST_ORIGIN`, `TYAGA_PHYSICAL_FEE_TEST=1` et les clés Stripe de test. Les commandes de recette restent exclues des avantages réels et du parrainage.
 
 ## Récompenses à l’issue d’une vente
 

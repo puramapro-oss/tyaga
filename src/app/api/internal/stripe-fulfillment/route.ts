@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
 import { handleDigitalTestEvent } from '@/lib/digital-checkout-test';
-import { checkPilotCheckout, checkPilotRefund, type PaymentOrder } from '@/lib/physical-pilot-receipt';
-import { hasPhysicalTestStripeKey, PHYSICAL_PILOT_POLICY } from '@/lib/physical-sale-pilot';
+import { checkPilotCheckout, checkPilotPaymentIntent, checkPilotRefund, type PaymentOrder } from '@/lib/physical-pilot-receipt';
+import { isPhysicalPilotPolicy, PHYSICAL_PILOT_POLICIES } from '@/lib/physical-fee-policy';
+import { hasPhysicalTestStripeKey } from '@/lib/physical-sale-pilot';
 import { refundCompletedSale } from '@/lib/order-refund';
 import { createServiceClient } from '@/lib/service';
 import { getStripe } from '@/lib/stripe';
@@ -112,7 +113,7 @@ const paymentColumns = 'id,buyer_id,seller_id,amount_cents,fee_policy,stripe_che
 async function readPaymentOrder(service: ServiceClient, column: 'id' | 'stripe_payment_intent_id' | 'stripe_checkout_session_id',
   value: string, onlyPilot = false): Promise<PaymentOrder | null> {
   let query = service.from('marketplace_orders').select(paymentColumns).eq(column, value);
-  if (onlyPilot) query = query.eq('fee_policy', PHYSICAL_PILOT_POLICY);
+  if (onlyPilot) query = query.in('fee_policy', PHYSICAL_PILOT_POLICIES);
   const { data, error } = await query.maybeSingle();
   if (error) throw new Error('Lecture de la commande impossible.');
   return data;
@@ -123,11 +124,11 @@ async function validateCheckout(service: ServiceClient, session: Stripe.Checkout
   const order = stated ? await readPaymentOrder(service, 'id', stated) : null;
   // A missing or displaced metadata marker cannot disguise a session already
   // bound to a pilot order as a legacy orphan eligible for an automatic refund.
-  const bound = session.id && order?.fee_policy !== PHYSICAL_PILOT_POLICY && order?.stripe_checkout_session_id !== session.id
+  const bound = session.id && !isPhysicalPilotPolicy(order?.fee_policy) && order?.stripe_checkout_session_id !== session.id
     ? await readPaymentOrder(service, 'stripe_checkout_session_id', session.id, true) : null;
   const receiptOrder = bound ?? order;
   checkPilotCheckout(receiptOrder, session, live, expected);
-  return receiptOrder?.fee_policy === PHYSICAL_PILOT_POLICY;
+  return receiptOrder && isPhysicalPilotPolicy(receiptOrder.fee_policy) ? receiptOrder : null;
 }
 
 
@@ -137,15 +138,19 @@ async function handleCheckoutCompleted(
   service: ServiceClient,
   live: boolean
 ): Promise<void> {
-  const pilot = await validateCheckout(service, session, live, 'paid');
-  if (pilot && !hasPhysicalTestStripeKey()) throw new Error('Prestataire de test indisponible.');
-  const pilotStripe = pilot ? getStripe() : null;
+  const pilotOrder = await validateCheckout(service, session, live, 'paid');
+  if (pilotOrder && !hasPhysicalTestStripeKey()) throw new Error('Prestataire de test indisponible.');
+  const pilotStripe = pilotOrder ? getStripe() : null;
   if (session.payment_status !== 'succeeded' && session.payment_status !== 'paid') return;
 
   const orderId = session.metadata?.order_id;
   const paymentIntentId =
-    typeof session.payment_intent === 'string' ? session.payment_intent : null;
+    typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
   if (!orderId || !paymentIntentId) return;
+  if (pilotOrder && pilotStripe) {
+    const intent = await pilotStripe.paymentIntents.retrieve(paymentIntentId);
+    checkPilotPaymentIntent(pilotOrder, intent, paymentIntentId, live);
+  }
 
   const now = new Date().toISOString();
   // .eq('status','pending') = idempotent : un event rejoué ne retouche pas une commande déjà paid
@@ -226,7 +231,11 @@ async function handleRefunded(
   const intent = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
   const order = intent ? await readPaymentOrder(service, 'stripe_payment_intent_id', intent) : null;
   checkPilotRefund(order, charge, live);
-  const pilotStripe = order?.fee_policy === PHYSICAL_PILOT_POLICY ? getStripe() : null;
+  const pilotStripe = isPhysicalPilotPolicy(order?.fee_policy) ? getStripe() : null;
+  if (pilotStripe && order && intent) {
+    const captured = await pilotStripe.paymentIntents.retrieve(intent);
+    checkPilotPaymentIntent(order, captured, intent, live);
+  }
   await refundCompletedSale(charge, {
     store: service,
     getTransfers: () => (pilotStripe ?? getStripe()).transfers,

@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react';
 
 import SaleFeeSummary from '@/components/marketplace/SaleFeeSummary';
 import type { CommissionBreakdown } from '@/lib/commission';
+import { isPhysicalPilotPolicy } from '@/lib/physical-fee-policy';
 import { formatPrice } from '@/lib/utils';
 
 /**
@@ -29,7 +30,7 @@ const FIELDS = [
 export default function BuyPanel({ annonceId, quote }: BuyPanelProps) {
   const [updated, setUpdated] = useState<{ annonceId: string; quote: CommissionBreakdown } | null>(null);
   const currentQuote = updated?.annonceId === annonceId ? updated.quote : quote;
-  const pilot = currentQuote.policy === 'fr_p2p_test_v2';
+  const pilot = isPhysicalPilotPolicy(currentQuote.policy);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({ country: 'FR' });
