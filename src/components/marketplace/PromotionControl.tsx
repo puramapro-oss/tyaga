@@ -1,5 +1,6 @@
 'use client';
 
+import { promotionActivationMessage } from '@/lib/listing-promotion';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -16,11 +17,11 @@ export default function PromotionControl({ listingId, grantId, active, buttonLab
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ listingId, grantId, action: active ? 'cancel' : 'activate' }),
       });
+      const result = await response.json().catch(() => null);
       if (!response.ok) {
-        const result = await response.json().catch(() => null);
         setMessage(result?.error || 'Impossible de modifier la mise en avant.');
       } else {
-        setMessage(active ? 'Diffusion arrêtée.' : 'Bon activé.');
+        setMessage(active ? 'Diffusion arrêtée.' : promotionActivationMessage(result?.endsAt));
       }
       router.refresh();
     } catch {
