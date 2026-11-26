@@ -1,10 +1,11 @@
 'use client';
 
+import { promotionActivationMessage } from '@/lib/listing-promotion';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export default function PromotionControl({ listingId, grantId, active }: {
-  listingId: string; grantId: string; active: boolean;
+export default function PromotionControl({ listingId, grantId, active, buttonLabel }: {
+  listingId: string; grantId: string; active: boolean; buttonLabel?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -16,11 +17,11 @@ export default function PromotionControl({ listingId, grantId, active }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ listingId, grantId, action: active ? 'cancel' : 'activate' }),
       });
+      const result = await response.json().catch(() => null);
       if (!response.ok) {
-        const result = await response.json().catch(() => null);
         setMessage(result?.error || 'Impossible de modifier la mise en avant.');
       } else {
-        setMessage(active ? 'Diffusion arrêtée.' : 'Bon activé.');
+        setMessage(active ? 'Diffusion arrêtée.' : promotionActivationMessage(result?.endsAt));
       }
       router.refresh();
     } catch {
@@ -31,7 +32,7 @@ export default function PromotionControl({ listingId, grantId, active }: {
   }
   return (
     <div>
-      <button type="button" disabled={pending} onClick={submit} className="min-h-11 rounded-pill border border-border px-4">
+      <button type="button" aria-label={buttonLabel} disabled={pending} onClick={submit} className="min-h-11 rounded-pill border border-border px-4">
         {active ? 'Arrêter la diffusion' : 'Utiliser ce bon'}
       </button>
       <p role="status" className="text-xs">{message}</p>

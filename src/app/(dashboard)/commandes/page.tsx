@@ -179,7 +179,8 @@ export default async function CommandesPage({
                 <aside className="rounded-md border border-border p-3 text-sm">
                   <strong>Avantage de cette transaction · {PROMOTION_LABELS[promotion.benefit_status]}</strong>
                   <p>Mise en avant de {promotion.duration_hours} h pour une de tes annonces.</p>
-                  {promotion.benefit_status === 'available' && <p>À activer avant le {formatDate(promotion.redeem_until)} depuis ta fiche d’annonce. <Link className="link-nav" href="/marketplace">Ouvrir les annonces</Link></p>}
+                  {promotion.benefit_status === 'available' && <p>À activer avant le {formatDate(promotion.redeem_until)} sur une de tes annonces publiées. <Link className="link-nav" href={`/commandes/${o.id}/avantage`}>Choisir mon annonce</Link></p>}
+                  {promotion.benefit_status === 'active' && <Link className="link-nav" href={`/commandes/${o.id}/avantage`}>Suivre cette mise en avant</Link>}
                 </aside>
               )}
               <CommandeActions

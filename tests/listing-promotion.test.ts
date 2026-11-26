@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { getListingPromotionQuote } = (await import(
+const { getListingPromotionQuote, promotionActivationMessage } = (await import(
   new URL('../src/lib/listing-promotion.ts', import.meta.url).pathname
 )) as typeof import('../src/lib/listing-promotion');
 
@@ -45,5 +45,16 @@ test('aucun prix implicite, montant client ou autre devise', () => {
     { durationHours: 8761 }, { priceEurCentsTtc: 2147483648 }, { durationHours: 0 }, { durationHours: 0.5 }, { currency: 'CHF' }, { revision: '' }, { puramaPoints: undefined },
   ]) {
     assert.equal(getListingPromotionQuote(JSON.stringify({ ...fixture, ...patch }), start), null);
+  }
+});
+
+test('un reçu rejoué affiche son échéance d’origine même après la fin de diffusion', () => {
+  const receipt = '2020-11-25T12:34:00.123456+00:00';
+  const label = promotionActivationMessage(receipt);
+  assert.match(label, /25 novembre 2020/);
+  assert.match(label, /13:34/);
+  assert.equal(label, promotionActivationMessage('2020-11-25T13:34:00.123+01:00'));
+  for (const unreadable of [undefined, null, 'invalid', true]) {
+    assert.match(promotionActivationMessage(unreadable), /suivi du bon/);
   }
 });

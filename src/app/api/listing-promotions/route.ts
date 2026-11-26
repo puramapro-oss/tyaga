@@ -27,5 +27,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Ce bon ou cette annonce ne permet plus cette opération.' }, { status: 409 });
   }
   if (error) return NextResponse.json({ error: 'La mise en avant est momentanément indisponible.' }, { status: 503 });
-  return NextResponse.json({ ok: true });
+  // The RPC returns the original end time when an activation is replayed.
+  return NextResponse.json(activate ? { ok: true, endsAt: data } : { ok: true });
 }

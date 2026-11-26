@@ -8,6 +8,8 @@ DECLARE
 BEGIN
   INSERT INTO auth.users(id) VALUES(buyer),(seller),(outsider);
   PERFORM set_config('test.reward_buyer',buyer::text,true);
+  PERFORM set_config('test.reward_seller',seller::text,true);
+  PERFORM set_config('test.reward_listing',listing::text,true);
   PERFORM set_config('test.reward_outsider',outsider::text,true);
   PERFORM set_config('test.reward_order',sale::text,true);
   INSERT INTO tyaga.items(id,user_id) VALUES(item,seller);
@@ -37,6 +39,25 @@ DO $$ BEGIN IF EXISTS(SELECT FROM tyaga.my_sale_promotions(ARRAY[current_setting
 SELECT set_config('request.jwt.claim.sub',current_setting('test.reward_buyer'),true);
 DO $$ BEGIN IF (SELECT benefit_status FROM tyaga.my_sale_promotions(ARRAY[current_setting('test.reward_order')::uuid])) IS DISTINCT FROM 'available'
   THEN RAISE EXCEPTION 'Missing benefit to buyer'; END IF; END $$;
+DO $catalogue$
+DECLARE sale uuid:=current_setting('test.reward_order')::uuid; r record; buyer_grant uuid;
+BEGIN
+  SELECT * INTO STRICT r FROM tyaga.my_order_promotion(sale);
+  buyer_grant:=r.grant_id;
+  IF r.benefit_status <> 'available' OR r.active_listing IS NOT NULL THEN RAISE EXCEPTION 'Incorrect initial state'; END IF;
+  PERFORM set_config('request.jwt.claim.sub',current_setting('test.reward_seller'),true);
+  SELECT * INTO STRICT r FROM tyaga.my_order_promotion(sale);
+  IF r.grant_id=buyer_grant THEN RAISE EXCEPTION 'Participants share one benefit'; END IF;
+  PERFORM tyaga.redeem_listing_promotion(current_setting('test.reward_listing')::uuid,r.grant_id);
+  PERFORM tyaga.redeem_listing_promotion(current_setting('test.reward_listing')::uuid,r.grant_id);
+  SELECT * INTO STRICT r FROM tyaga.my_order_promotion(sale);
+  IF (r.benefit_status,r.active_listing) IS DISTINCT FROM ('active'::text,current_setting('test.reward_listing')::uuid)
+    THEN RAISE EXCEPTION 'Missing confirmation for the selected listing'; END IF;
+  PERFORM set_config('request.jwt.claim.sub',current_setting('test.reward_buyer'),true);
+  IF (SELECT benefit_status FROM tyaga.my_order_promotion(sale)) IS DISTINCT FROM 'available' THEN RAISE EXCEPTION 'Buyer benefit was consumed'; END IF;
+  PERFORM set_config('request.jwt.claim.sub',current_setting('test.reward_outsider'),true);
+  IF EXISTS(SELECT FROM tyaga.my_order_promotion(sale)) THEN RAISE EXCEPTION 'Another member sees a sale benefit'; END IF;
+END $catalogue$;
 RESET ROLE;
 SELECT set_config('request.jwt.claim.sub','',true);
 UPDATE tyaga.marketplace_orders SET status='cancelled',escrow_status='refunded' WHERE id=current_setting('test.reward_order')::uuid;
@@ -44,4 +65,8 @@ DO $$ BEGIN
   IF (SELECT count(*) FROM tyaga_promotion.grants WHERE revoked_at IS NOT NULL)<>2 THEN RAISE EXCEPTION 'Refund failed to revoke both benefits'; END IF;
   IF tyaga_promotion.award_sale(current_setting('test.reward_order')::uuid) THEN RAISE EXCEPTION 'Refund replay revived benefit'; END IF;
 END $$;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub',current_setting('test.reward_seller'),true);
+DO $$ BEGIN IF (SELECT benefit_status FROM tyaga.my_order_promotion(current_setting('test.reward_order')::uuid)) IS DISTINCT FROM 'revoked'
+  THEN RAISE EXCEPTION 'Revocation missing on the selection screen'; END IF; END $$;
 ROLLBACK;

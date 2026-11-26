@@ -49,3 +49,13 @@ export function getListingPromotionQuote(raw: string | undefined, now = Date.now
       || (priceEurCentsTtc === null && puramaPoints === null)) return null;
   return { revision, endsAt, durationHours, priceEurCentsTtc, puramaPoints };
 }
+
+/** The same receipt may be returned after a placement has already finished. */
+export function promotionActivationMessage(endsAt: unknown): string {
+  const deadline = typeof endsAt === 'string' ? Date.parse(endsAt) : NaN;
+  if (!Number.isFinite(deadline)) return 'Consulte le suivi du bon pour connaître son état.';
+  const date = new Intl.DateTimeFormat('fr-FR', {
+    timeZone: 'Europe/Paris', dateStyle: 'long', timeStyle: 'short',
+  }).format(deadline);
+  return `Échéance de diffusion enregistrée pour ce bon : ${date} (Paris).`;
+}

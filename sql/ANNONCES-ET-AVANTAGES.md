@@ -17,6 +17,7 @@ Les extensions s’appliquent à la base PostgreSQL de TYAGA sur une version inc
 9. promotion-points-pilot.sql
 10. published-listing-benefits.sql
 11. physical-sale-fee-v3.sql
+12. order-promotion-selection.sql
 
 Après installation recharger le cache de schéma PostgREST avec `NOTIFY pgrst, 'reload schema';`. Exécuter les régressions sur une base jetable. Les contrôles d’intégration sous PGlite se lancent avec `npm run test:member-marketplace`. La recette de concurrence native utilise `tests/listing-promotion-concurrency.mjs`, le pilote pg et deux connexions PostgreSQL indépendantes.
 
@@ -44,7 +45,7 @@ Pour tester, utiliser deux comptes de particuliers français qualifiés dans `ty
 
 ## Récompenses à l’issue d’une vente
 
-Une campagne de récompenses transactionnelles se configure dans `tyaga_promotion.sale_campaigns` par l’exploitant de la base. Elle exige une référence d’inventaire publicitaire effectivement réservée, une fenêtre de vente, un nombre maximal de paires de bons, une limite par personne, un minimum de vente et les durées de diffusion et de validité. La table est vide à l’installation. Les quotas comptent également les bons révoqués. Chaque vente effectivement réglée et rapprochée peut alors attribuer un bon à l’acheteur et un bon au vendeur. Le numéro de commande assure l’unicité. Le remboursement ou le passage du règlement en réexamen retire les droits. Les bons et leur statut apparaissent dans Commandes. Le rapprochement serveur peut rejouer `tyaga_promotion.award_sale(order_id)` pendant la campagne si l’attribution a été différée.
+Une campagne de récompenses transactionnelles se configure dans `tyaga_promotion.sale_campaigns` par l’exploitant de la base. Elle exige une référence d’inventaire publicitaire effectivement réservée, une fenêtre de vente, un nombre maximal de paires de bons, une limite par personne, un minimum de vente et les durées de diffusion et de validité. La table est vide à l’installation. Les quotas comptent également les bons révoqués. Chaque vente effectivement réglée et rapprochée peut alors attribuer un bon à l’acheteur et un bon au vendeur. Le numéro de commande assure l’unicité. Le remboursement ou le passage du règlement en réexamen retire les droits. Dans Commandes, chaque participant choisit une de ses annonces publiées pour activer son propre bon. La campagne TYAGA couvre cette mise en avant. Le prix de vente et le règlement au vendeur gardent les montants de la commande. Le rapprochement serveur peut rejouer `tyaga_promotion.award_sale(order_id)` pendant la campagne si l’attribution a été différée.
 
 ## Acheter un bon avec des points en recette
 
