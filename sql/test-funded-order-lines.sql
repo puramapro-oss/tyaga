@@ -56,7 +56,11 @@ ALTER TABLE tyaga_fee.funded_order_receipts ENABLE ROW LEVEL SECURITY;
 CREATE OR REPLACE FUNCTION tyaga.read_test_funded_order_line(p_order uuid,p_buyer uuid,p_seller uuid)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
 BEGIN
- IF coalesce(current_setting('role',true),'') NOT IN ('service_role','purama_pay_test_operator') OR tyaga_fee.funded_order_tenant() IS NULL THEN
+ IF tyaga_fee.funded_order_tenant() IS NULL OR NOT (
+    coalesce(current_setting('role',true),'') IN ('service_role','purama_pay_test_operator')
+    OR (current_setting('role',true)='authenticated' AND auth.uid() IS NOT NULL
+        AND (auth.uid()=p_buyer OR auth.uid()=p_seller))
+ ) THEN
     RAISE EXCEPTION 'isolated operator required' USING ERRCODE='42501';
  END IF;
  RETURN (SELECT jsonb_build_object('order_id',o.id,'buyer_id',o.buyer_id,'seller_id',o.seller_id,
@@ -150,5 +154,33 @@ GRANT EXECUTE ON FUNCTION tyaga.read_test_funded_order_line(uuid,uuid,uuid),
 REVOKE EXECUTE ON FUNCTION tyaga.record_test_funded_order_transfer(text,uuid,uuid,uuid,text,text,integer,text,text,text,integer,text,text) FROM service_role;
 GRANT USAGE ON SCHEMA tyaga TO purama_pay_test_operator;
 GRANT EXECUTE ON FUNCTION tyaga.record_test_funded_order_transfer(text,uuid,uuid,uuid,text,text,integer,text,text,text,integer,text,text) TO purama_pay_test_operator;
+-- The dashboard receives no operator references, other parties' orders or payment instructions.
+-- Only this restricted projection is executable with the member's session.
+CREATE OR REPLACE FUNCTION tyaga.my_test_funded_orders(p_orders uuid[])
+RETURNS TABLE(order_id uuid,pay_status text,seller_status text,reconciliation_status text,
+              funded_cents integer,buyer_due_cents integer)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE viewer uuid:=auth.uid(); tenant text:=tyaga_fee.funded_order_tenant(); o record; src jsonb; f jsonb;
+BEGIN
+ IF viewer IS NULL OR tenant IS NULL OR cardinality(p_orders)>50 THEN RETURN; END IF;
+ FOR o IN SELECT m.id,m.buyer_id,m.seller_id FROM tyaga.marketplace_orders m
+          WHERE m.id=ANY(p_orders) AND viewer IN (m.buyer_id,m.seller_id)
+            AND m.funding_route='pay_test' LOOP
+   src:=purama_pay_test.read_eur_line(tenant,o.buyer_id,o.id,o.seller_id);
+   order_id:=o.id;
+   IF src IS NULL THEN
+     pay_status:='awaiting_funding'; seller_status:='unconfirmed'; reconciliation_status:='awaiting_funding';
+     funded_cents:=NULL; buyer_due_cents:=NULL;
+   ELSE
+     f:=tyaga.reconcile_test_funded_order_line(tenant,o.buyer_id,o.id,o.seller_id,
+       src->>'fundingRef',src->>'basketRef',(src->>'amountCents')::integer);
+     pay_status:=f->>'pay_status'; seller_status:=f->>'seller_status'; reconciliation_status:=f->>'reconciliation_status';
+     funded_cents:=(f->>'funded_cents')::integer; buyer_due_cents:=(f->>'buyer_due_cents')::integer;
+   END IF;
+   RETURN NEXT;
+ END LOOP;
+END $$;
+REVOKE ALL ON FUNCTION tyaga.my_test_funded_orders(uuid[]) FROM PUBLIC,anon,service_role;
+GRANT EXECUTE ON FUNCTION tyaga.my_test_funded_orders(uuid[]) TO authenticated;
 NOTIFY pgrst,'reload schema';
 COMMIT;

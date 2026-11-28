@@ -45,15 +45,15 @@ async function load(admin, name, path) {
   await admin.query(bytes.toString('utf8'));
 }
 const scalar = async (client,sql,args) => Object.values((await client.query(sql,args)).rows[0])[0];
-async function seedOrder(admin,seller,price,fee) {
+async function seedOrder(admin,seller,price,fee,route='pay_test') {
   const item = randomUUID(), listing = randomUUID(), order = randomUUID();
   await admin.query('INSERT INTO tyaga.items(id,user_id) VALUES($1,$2)', [item,seller]);
   await admin.query(`INSERT INTO tyaga.annonces(id,user_id,item_id,title,description,price_cents,status,user_validated,published_at,fee_policy)
     VALUES($1,$2,$3,'Fixture','Test isolé', $4,'published',true,now(),'fr_p2p_test_v3')`,[listing,seller,item,price]);
   await admin.query(`INSERT INTO tyaga.marketplace_orders(id,annonce_id,item_id,buyer_id,seller_id,amount_cents,
     commission_pct,commission_amount_cents,net_amount_cents,shipping_address,fee_policy,item_amount_cents,buyer_fee_cents,funding_route)
-    VALUES($1,$2,$3,$4,$5,$6,0,0,$7,'{"country":"FR"}','fr_p2p_test_v3',$7,$8,'pay_test')`,
-    [order,listing,item,buyer,seller,price+fee,price,fee]);
+    VALUES($1,$2,$3,$4,$5,$6,0,0,$7,'{"country":"FR"}','fr_p2p_test_v3',$7,$8,$9)`,
+    [order,listing,item,buyer,seller,price+fee,price,fee,route]);
   return {orderId:order,sellerId:seller,amountCents:price+fee};
 }
 async function setup(admin) {
@@ -114,6 +114,19 @@ async function exercise(admin) {
   summary.testReferences={tenant,buyer,funding,basket,
     a:{...offerA,sellerTransfer:'fixture-transfer-a',sellerReversal:'fixture-reversal-a',buyerRefund:'fixture-buyer-return-a'},
     b:{...offerB,sellerTransfer:'fixture-transfer-b'}};
+  const regular=await seedOrder(admin,sellers[1],7734,267,'stripe');
+  const ids=[offerA.orderId,offerB.orderId,regular.orderId];
+  const customerView=async (viewer, orderIds=ids)=>{
+    await publicClient.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[viewer]);
+    return (await publicClient.query('SELECT * FROM tyaga.my_test_funded_orders($1::uuid[]) ORDER BY order_id',[orderIds])).rows;
+  };
+  const waiting=await customerView(buyer);
+  assert.deepEqual(waiting.map(r=>r.order_id).sort(),ids.slice(0,2).sort());
+  const fields=['order_id','pay_status','seller_status','reconciliation_status','funded_cents','buyer_due_cents'];
+  for(const row of waiting){
+    assert.deepEqual(Object.keys(row).sort(),[...fields].sort());
+    assert.deepEqual([row.pay_status,row.funded_cents,row.buyer_due_cents],['awaiting_funding',null,null]);
+  }
   const raceA = await seedOrder(admin,sellers[0],11616,383);
   const raceB = await seedOrder(admin,sellers[1],11616,383);
   const marketRead = o=>scalar(market,'SELECT tyaga.read_test_funded_order_line($1,$2,$3)',[o.orderId,buyer,o.sellerId]);
@@ -183,6 +196,24 @@ async function exercise(admin) {
   await blocked(()=>reconcile(offerA,offerA.amountCents-1));
   assert.equal((await payRead(offerB)).status,'captured');
   await finishScenario({admin,issuer,market,pay,offerA,offerB,available,payRead,marketRead,reconcile,blocked,transition});
+  const buyerView=await customerView(buyer);
+  const rowA=buyerView.find(row=>row.order_id===offerA.orderId);
+  const rowB=buyerView.find(row=>row.order_id===offerB.orderId);
+  assert.deepEqual([rowA.pay_status,rowA.seller_status,rowA.reconciliation_status,rowA.buyer_due_cents],
+    ['refunded','reversed','returned',null]);
+  assert.deepEqual([rowB.pay_status,rowB.seller_status,rowB.reconciliation_status,rowB.funded_cents,rowB.buyer_due_cents],
+    ['captured','confirmed','seller_confirmed',8001,0]);
+  assert.deepEqual(await customerView(sellers[0]),[rowA]);
+  assert.deepEqual(await customerView(sellers[1]),[rowB]);
+  assert.deepEqual(await customerView(randomUUID()),[]);
+  assert.deepEqual(await customerView(''),[]);
+  await customerView(buyer);
+  await blocked(()=>scalar(publicClient,'SELECT tyaga.read_test_funded_order_line($1,$2,$3)',[offerA.orderId,buyer,offerA.sellerId]),
+    e=>e.code==='42501');
+  await admin.query('ALTER DATABASE tyaga_test_funded_cross RESET tyaga.funded_order_tenant');
+  assert.deepEqual(await customerView(buyer),[]);
+  summary.checks.userProjection={buyer:buyerView.length,sellerA:1,sellerB:1,other:0,regularStripe:0,
+    disabledTenant:0,initialStatus:waiting[0].pay_status,allowedFields:fields};
 }
 
 async function finishScenario({admin,issuer,market,pay,offerA,offerB,available,payRead,marketRead,reconcile,blocked,transition}) {
