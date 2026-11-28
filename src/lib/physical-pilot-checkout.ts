@@ -19,6 +19,7 @@ export async function createPhysicalPilotCheckout(
   buyerId: string,
   quote: CommissionBreakdown,
   address: Address,
+  fundingRoute: 'stripe' | 'pay_test' = 'stripe',
 ) {
   const origin = physicalPilotTestOrigin();
   if (!origin || !await canUsePhysicalSalePilot(client) || address.country !== 'FR') {
@@ -32,18 +33,21 @@ export async function createPhysicalPilotCheckout(
     .select('stripe_connect_account_id').eq('id', listing.user_id).maybeSingle();
   if (sellerError || !seller?.stripe_connect_account_id) return unavailable();
 
-  const stripe = getStripe();
-  try {
-    const account = await stripe.accounts.retrieve(seller.stripe_connect_account_id);
-    if (account.country !== 'FR' || account.capabilities?.transfers !== 'active' || !account.payouts_enabled) {
+  if (fundingRoute === 'stripe') {
+    const stripe = getStripe();
+    try {
+      const account = await stripe.accounts.retrieve(seller.stripe_connect_account_id);
+      if (account.country !== 'FR' || account.capabilities?.transfers !== 'active' || !account.payouts_enabled) {
+        return unavailable();
+      }
+    } catch {
       return unavailable();
     }
-  } catch {
-    return unavailable();
   }
 
   const { data: inserted, error } = await client.from('marketplace_orders').insert({
     annonce_id: listing.id, item_id: listing.item_id, buyer_id: buyerId, seller_id: listing.user_id,
+    ...(fundingRoute === 'pay_test' ? { funding_route: fundingRoute } : {}),
     fee_policy: policy, item_amount_cents: quote.itemCents, buyer_fee_cents: quote.buyerFeeCents,
     amount_cents: quote.grossCents, commission_pct: 0, commission_amount_cents: 0, net_amount_cents: quote.netCents,
     status: 'pending', escrow_status: 'none', shipping_address: address,
@@ -52,12 +56,12 @@ export async function createPhysicalPilotCheckout(
   let order = inserted;
   if (error?.code === '23505') {
     const { data: prior, error: lookupError } = await client.from('marketplace_orders')
-      .select(orderColumns).eq('annonce_id', listing.id).eq('buyer_id', buyerId).eq('status', 'pending').maybeSingle();
+      .select('*').eq('annonce_id', listing.id).eq('buyer_id', buyerId).eq('status', 'pending').maybeSingle();
     if (lookupError) return unavailable();
     const addressMatches = prior && Object.keys({ ...address, ...prior.shipping_address }).every(
       key => prior.shipping_address?.[key] === address[key as keyof Address],
     );
-    if (!prior || prior.fee_policy !== policy || prior.item_amount_cents !== quote.itemCents ||
+    if (!prior || (prior.funding_route ?? 'stripe') !== fundingRoute || prior.fee_policy !== policy || prior.item_amount_cents !== quote.itemCents ||
         prior.buyer_fee_cents !== quote.buyerFeeCents || prior.amount_cents !== quote.grossCents || !addressMatches) {
       return NextResponse.json({ error: 'Une commande existe déjà pour cet objet. Consulte tes commandes.' }, { status: 409 });
     }
@@ -69,6 +73,14 @@ export async function createPhysicalPilotCheckout(
   }
   if (!order) return unavailable();
 
+  // An operator must reconcile the independent PAY and seller receipts.
+  // No Stripe session may collect the gross amount for this order.
+  if (fundingRoute === 'pay_test') return NextResponse.json({
+    orderId: order.id, state: 'awaiting_funding', currency: 'EUR',
+    grossCents: order.amount_cents, sellerNetCents: quote.netCents, buyerFeeCents: order.buyer_fee_cents,
+  });
+
+  const stripe = getStripe();
   const metadata = { app_slug: 'tyaga', order_id: order.id, buyer_id: buyerId, seller_id: listing.user_id, fee_policy: policy };
   try {
     // If the first response was lost, use the same parameters and Stripe key.

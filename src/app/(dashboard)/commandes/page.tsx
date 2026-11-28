@@ -4,6 +4,7 @@ import Link from 'next/link';
 import CommandeActions from '@/components/marketplace/CommandeActions';
 import PackingChecklist from '@/components/marketplace/PackingChecklist';
 import { isPhysicalPilotPolicy, physicalBuyerFeePercentLabel } from '@/lib/physical-fee-policy';
+import { fundedOrderMessages, type FundedOrderView } from '@/lib/funded-order-display';
 import { orderPaymentLabel } from '@/lib/order-payment-label';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { formatDate, formatPrice } from '@/lib/utils';
@@ -45,6 +46,7 @@ interface OrderRow {
   stripe_transfer_id: string | null;
   amount_cents: number;
   fee_policy: string;
+  funding_route?: 'stripe' | 'pay_test';
   item_amount_cents: number | null;
   buyer_fee_cents: number | null;
   net_amount_cents: number;
@@ -65,25 +67,27 @@ export default async function CommandesPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: orders } = await supabase
-    .from('marketplace_orders')
-    .select(
-      `id, buyer_id, seller_id, status, escrow_status, stripe_transfer_id, amount_cents,
+  const fields = `id, buyer_id, seller_id, status, escrow_status, stripe_transfer_id, amount_cents,
        fee_policy, item_amount_cents, buyer_fee_cents, net_amount_cents, commission_amount_cents, shipping_address, created_at,
-       annonces ( id, title )`
-    )
-    .order('created_at', { ascending: false })
-    .limit(50);
+       annonces ( id, title )`;
+  const readOrders = (columns: string) => supabase.from('marketplace_orders').select(columns)
+    .order('created_at', { ascending: false }).limit(50);
 
-  const rows = ((orders ?? []) as unknown as OrderRow[]).map((o) => ({
-    ...o,
-    role: (user?.id === o.buyer_id ? 'buyer' : 'seller') as 'buyer' | 'seller',
-  }));
-
-  const { data: promotions } = rows.length && user
-    ? await supabase.rpc('my_sale_promotions', { p_orders: rows.map(order => order.id) })
-    : { data: [] };
-  const promotionByOrder = new Map((promotions as SalePromotion[] | null ?? []).map(p => [p.order_id, p]));
+  let orders = user ? await readOrders(fields + ', funding_route') : null;
+  // A host still using the historical schema can only contain Stripe orders.
+  if (orders?.error && ['42703', 'PGRST204'].includes(orders.error.code) && orders.error.message.includes('funding_route')) {
+    orders = await readOrders(fields);
+  }
+  const rows = ((orders?.data ?? []) as unknown as OrderRow[])
+    .filter(o => user && (user.id === o.buyer_id || user.id === o.seller_id))
+    .map(o => ({ ...o, role: user!.id === o.buyer_id ? 'buyer' as const : 'seller' as const }));
+  const fundedIds = rows.filter(o => o.funding_route === 'pay_test').map(o => o.id);
+  const [promotions, funding] = await Promise.all([
+    rows.length ? supabase.rpc('my_sale_promotions', { p_orders: rows.map(o => o.id) }) : { data: [] },
+    fundedIds.length ? supabase.rpc('my_test_funded_orders', { p_orders: fundedIds }) : { data: [] },
+  ]);
+  const promotionByOrder = new Map(((promotions.data ?? []) as SalePromotion[]).map(p => [p.order_id, p]));
+  const fundingByOrder = new Map(((funding.data ?? []) as FundedOrderView[]).map(f => [f.order_id, f]));
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -118,6 +122,7 @@ export default async function CommandesPage({
         <ul className="flex flex-col gap-4">
           {rows.map((o) => {
             const promotion = promotionByOrder.get(o.id);
+            const funded = o.funding_route === 'pay_test';
             return (
             <li key={o.id} className="glass flex flex-col gap-3 p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -131,7 +136,7 @@ export default async function CommandesPage({
                 </Link>
                 <span className="rounded-pill bg-primary/15 px-3 py-1 text-xs font-medium text-primary-on-dark">
                   {o.role === 'buyer' ? 'Achat' : 'Vente'} ·{' '}
-                  {STATUS_LABELS[o.status] ?? o.status}
+                  {funded && o.status === 'pending' ? 'Traitement logistique en attente' : STATUS_LABELS[o.status] ?? o.status}
                 </span>
               </div>
 
@@ -148,12 +153,17 @@ export default async function CommandesPage({
                     (commission {formatPrice(o.commission_amount_cents)})
                   </span>
                 )}
-                <span className="text-foreground-muted">
-                  {orderPaymentLabel(o)}
-                </span>
+                {!funded && <span className="text-foreground-muted">{orderPaymentLabel(o)}</span>}
               </div>
 
-              {o.role === 'seller' &&
+              {funded && (
+                <aside className="rounded-md border border-border p-3 text-sm">
+                  <strong>Financement de cette commande · test</strong>
+                  {fundedOrderMessages(fundingByOrder.get(o.id)).map(message => <p key={message}>{message}</p>)}
+                </aside>
+              )}
+
+              {!funded && o.role === 'seller' &&
                 o.status !== 'pending' &&
                 o.status !== 'cancelled' &&
                 o.shipping_address && (
@@ -171,7 +181,7 @@ export default async function CommandesPage({
                   </div>
                 )}
 
-              {o.role === 'seller' && o.status === 'paid' && (
+              {!funded && o.role === 'seller' && o.status === 'paid' && (
                 <PackingChecklist orderId={o.id} />
               )}
 
@@ -182,11 +192,11 @@ export default async function CommandesPage({
                   {promotion.benefit_status === 'available' && <p>À activer avant le {formatDate(promotion.redeem_until)} depuis ta fiche d’annonce. <Link className="link-nav" href="/marketplace">Ouvrir les annonces</Link></p>}
                 </aside>
               )}
-              <CommandeActions
+              {!funded && <CommandeActions
                 orderId={o.id} status={o.status} role={o.role}
                 settlementPending={!o.stripe_transfer_id && o.net_amount_cents > 0
                   && o.escrow_status !== 'refunded'}
-              />
+              />}
             </li>
             );
           })}
