@@ -28,6 +28,7 @@ const addressSchema = z.object({
 
 const bodySchema = z.object({
   annonceId: z.string().uuid(),
+  fundingRoute: z.enum(['stripe', 'pay_test']).optional(),
   expectedQuote: expectedSaleQuote,
   shippingAddress: addressSchema,
 });
@@ -103,7 +104,10 @@ export async function POST(request: Request) {
       quote,
     }, { status: 409 });
   }
-  if (pilot) return createPhysicalPilotCheckout(supabase, annonce, user.id, quote, shippingAddress);
+  if (!pilot && parsed.data.fundingRoute === 'pay_test') {
+    return NextResponse.json({ error: 'Ce financement est réservé aux commandes de recette.' }, { status: 409 });
+  }
+  if (pilot) return createPhysicalPilotCheckout(supabase, annonce, user.id, quote, shippingAddress, parsed.data.fundingRoute);
 
   const verificationRequired = (orderId?: string) => NextResponse.json({
     error: 'Le paiement attend une vérification. Consulte tes commandes avant une nouvelle tentative.',

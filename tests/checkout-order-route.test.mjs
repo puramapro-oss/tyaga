@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import vm from 'node:vm';
 import * as feePolicy from '../src/lib/physical-fee-policy.ts';
-import { computeCommission } from '../src/lib/commission.ts';
+import { computeCommission, physicalPilotQuote } from '../src/lib/commission.ts';
 import { sameSaleQuote } from '../src/lib/physical-order-quote.ts';
 import { expectedSaleQuote } from '../src/lib/sale-quote-input.ts';
 import * as transitions from '../src/lib/order-transitions.ts';
@@ -45,11 +45,11 @@ async function moduleFor(source, bindings, extras = {}) {
 // they neither contact Stripe nor claim to execute PostgreSQL/RLS.
 async function app(options = {}) {
   let userId = options.userId === undefined ? ids.buyer : options.userId;
-  const quote = computeCommission(1000);
+  const quote = options.realPilot ? physicalPilotQuote(1000) : computeCommission(1000);
   const listing = { id: ids.listing, item_id: 'item', user_id: ids.seller,
-    title: 'Article de test', price_cents: 1000, status: 'published', fee_policy: 'legacy' };
+    title: 'Article de test', price_cents: 1000, status: 'published', fee_policy: options.realPilot ? feePolicy.PHYSICAL_PILOT_POLICY : 'legacy' };
   const state = { orders: [], sessions: [], created: [], retrieved: [], cancelled: [], expired: [], rpcCalls: [], pilotCalls: 0, customerCalls: 0 };
-  const profile = { id: ids.buyer, stripe_customer_id: options.newCustomer ? null : 'cus_existing' };
+  const profile = { id: ids.buyer, stripe_customer_id: options.newCustomer ? null : 'cus_existing', stripe_connect_account_id: 'acct_testSeller' };
 
   function client(service = false) {
     return {
@@ -100,7 +100,7 @@ async function app(options = {}) {
             if (state.orders.some(row => row.annonce_id === inserted.annonce_id && active.includes(row.status))) {
               return { data: null, error: { code: '23505' } };
             }
-            const row = { ...inserted, id: `order${state.orders.length + 1}`, fee_policy: 'legacy',
+            const row = { ...inserted, id: `order${state.orders.length + 1}`, fee_policy: inserted.fee_policy ?? 'legacy',
               stripe_checkout_session_id: null, created_at: new Date().toISOString() };
             state.orders.push(row);
             return { data: { ...row }, error: null };
@@ -139,6 +139,7 @@ async function app(options = {}) {
     };
   }
   const stripe = {
+    accounts: { retrieve: async () => ({ country: 'FR', capabilities: { transfers: 'active' }, payouts_enabled: true }) },
     customers: { async create() { state.customerCalls++; return { id: 'cus_created' }; } },
     checkout: { sessions: {
       async create(args, requestOptions) {
@@ -185,6 +186,16 @@ async function app(options = {}) {
     '@/lib/stripe': { getStripe: () => stripe },
     '@/lib/supabase-server': { createServerSupabaseClient: async () => client() },
   };
+  if (options.realPilot) {
+    const pilot = ts.transpileModule(await readFile(new URL('../src/lib/physical-pilot-checkout.ts', import.meta.url), 'utf8'), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+    }).outputText;
+    bindings['@/lib/physical-pilot-checkout'] = await moduleFor(pilot, {
+      'next/server': { NextResponse }, './physical-fee-policy': feePolicy,
+      './physical-sale-pilot': { canUsePhysicalSalePilot: async () => true, physicalPilotTestOrigin: () => 'https://tyaga.example.test' },
+      './service': bindings['@/lib/service'], './stripe': bindings['@/lib/stripe'],
+    });
+  }
   const route = await moduleFor(routeSource, bindings);
   const transition = await moduleFor(transitionSource, bindings);
   const body = () => ({ annonceId: ids.listing, expectedQuote: { ...quote }, shippingAddress: { ...address } });
@@ -463,4 +474,27 @@ test('cancellation still requires the authenticated action owner', async () => {
   assert.equal((await a.transition()).status, 401);
   assert.equal(a.state.expired.length, 0);
   assert.equal(a.state.rpcCalls.length, 0);
+});
+
+test('la réservation PAY est rejouable sans session Stripe et conserve son circuit', async () => {
+  const a = await app({ realPilot: true });
+  const body = { ...a.body(), fundingRoute: 'pay_test' };
+  const reserved = await a.post(body);
+  assert.equal(reserved.status, 200);
+  assert.equal(reserved.body.state, 'awaiting_funding');
+  assert.equal(reserved.body.grossCents, a.quote.grossCents);
+  assert.equal(reserved.body.sellerNetCents, 1000);
+  assert.equal(reserved.body.url, undefined);
+  assert.deepEqual(await a.post(body), reserved);
+  assert.equal((await a.post(a.body())).status, 409);
+  assert.equal(a.state.orders.length, 1);
+  assert.equal(a.state.orders[0].funding_route, 'pay_test');
+  assert.equal(a.state.created.length, 0);
+  const standard = await app({ realPilot: true });
+  assert.equal((await standard.post()).status, 200);
+  assert.equal((await standard.post({ ...standard.body(), fundingRoute: 'pay_test' })).status, 409);
+  assert.equal(standard.state.sessions.length, 1);
+  const legacy = await app();
+  assert.equal((await legacy.post({ ...legacy.body(), fundingRoute: 'pay_test' })).status, 409);
+  assert.equal(legacy.state.created.length, 0);
 });

@@ -3,7 +3,8 @@
   "git": {
     "deploymentEnabled": {
       "codex/order-settlement-audit-20261122": false,
-      "codex/audit-tyaga-checkout-reconcile-20261125": false
+      "codex/audit-tyaga-checkout-reconcile-20261125": false,
+      "feat/funded-order-reconciliation-test": false
     }
   }
 }
